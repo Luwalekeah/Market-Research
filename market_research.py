@@ -1,5 +1,5 @@
 import os
-from io import StringIO
+import io
 import base64
 import folium
 import googlemaps
