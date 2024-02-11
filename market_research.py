@@ -1,14 +1,14 @@
 import os
-import io
-import base64
-import folium
+import streamlit as st
 import googlemaps
 import pandas as pd
-import streamlit as st
-from pathlib import Path
-from dotenv import load_dotenv
 from geopy.distance import geodesic
+from pathlib import Path
+import base64
+import folium
+from folium.plugins import MarkerCluster
 from streamlit_folium import folium_static
+from dotenv import load_dotenv
 
 # Load environment variables from .env file
 load_dotenv()
@@ -54,18 +54,26 @@ def find_places(api_key, location, distance, place_types):
 
             # Check if the distance is within the specified search distance
             if distance_miles <= distance:
+                # Place Details request to get additional information
+                details_result = gmaps.place(place['place_id'], fields=['formatted_phone_number', 'current_opening_hours', 'website', 'user_ratings_total', 'rating'])
+
                 # Extract the primary type (first element in the types array)
                 primary_type = place.get('types', [])[0] if place.get('types', []) else ''
 
-                # Create a simplified place_info dictionary without phone, website, and opening hours
+                # Create a simplified place_info dictionary with additional details
                 place_info = {
                     'Place_ID': place['place_id'],
                     'Name': place['name'],
                     'Address': place.get('formatted_address', ''),
                     'Type': primary_type,
                     'Distance': round(distance_miles, 2),
+                    'Phone': details_result.get('formatted_phone_number', ''),
+                    'Website': details_result.get('website', ''),
+                    'Opening_Hours': details_result.get('opening_hours', {}).get('weekday_text', ''),
+                    'Rating': details_result.get('rating', 'N/A'),
+                    'User_Ratings_Total': details_result.get('user_ratings_total', 'N/A'),
                     'Latitude': place_location[0],
-                    'Longitude': place_location[1],
+                    'Longitude': place_location[1]
                 }
 
                 places.append(place_info)
@@ -82,8 +90,17 @@ def find_places(api_key, location, distance, place_types):
 with open(css_file) as f:
     st.markdown("<style>{}</style>".format(f.read()), unsafe_allow_html=True)
 
-# Streamlit app
-st.title("Google Maps Places Search")
+# Streamlit app Begins
+st.markdown("<h1 style='text-align: center;'>Google Maps Places Search</h1>", unsafe_allow_html=True)
+
+# adding some spacing
+st.write("\n")
+
+# Banner below the title
+st.markdown("<div style='text-align: center; background-color: white; padding: 10px; border: 2px solid red; border-radius: 5px; font-weight: bold; color: black;'>Error(s) resolves with input of address and place type.</div>", unsafe_allow_html=True)
+# adding some spacing
+st.write("\n")
+
 
 location = st.text_input("Enter your location (address, city, etc.):")
 distance = st.slider("Choose the search distance in miles:", min_value=1.0, max_value=50.0, step=1.0)
@@ -99,42 +116,43 @@ if GOOGLE_MAPS_API_KEY:
     # Create DataFrame from the combined results
     df_unique = pd.DataFrame(all_places)
 
-    # Rename columns to match the expected names for latitude and longitude
-    df_unique.rename(columns={'Latitude': 'lat', 'Longitude': 'lon'}, inplace=True)
-
     # Filter the DataFrame to keep only unique places based on 'Place_ID'
     df_unique = df_unique.drop_duplicates(subset='Place_ID')
 
     # Sort the DataFrame by 'Distance' in ascending order
     df_unique = df_unique[df_unique['Distance'] <= distance].sort_values(by='Distance')
+    
+    # Notify user of csv export cability
+    st.markdown("<p style='text-align: center; color: red; font-style: italic;'>Want to export data to CSV or enlarge: click top-right corner of the table.</p>", unsafe_allow_html=True)
 
+    # Display the results
+    st.write(f"Results for {location}")
+    st.write(df_unique)
 
-#----------------------------------------------------------------
-#----------------------------------------------------------------
+    # Create a Folium map with markers based on the 'Latitude' and 'Longitude' columns in df_unique
+    map_with_markers = folium.Map(location=[df_unique['Latitude'].mean(), df_unique['Longitude'].mean()], zoom_start=10)
 
-# Display the results
-st.write(f"Results for {location}")
-st.write(df_unique)
+    # Add a Marker Cluster to group markers
+    marker_cluster = MarkerCluster().add_to(map_with_markers)
 
-# Create a Folium map with markers based on the 'latitude' and 'longitude' columns in df_unique
-map_with_markers = folium.Map(location=[df_unique['lat'].mean(), df_unique['lon'].mean()], zoom_start=10)
+    for index, row in df_unique.iterrows():
+        # Dynamic popup text for each marker
+        popup_text = f"<div style='white-space: nowrap;'><b>{row['Name']}</b><br>" \
+                     f"Opening Hours: {row['Opening_Hours']}<br>" \
+                     f"Rating: {row.get('Rating', 'N/A')}<br>" \
+                     f"Distance: {row['Distance']} miles</div>"
 
-# Add markers to the map for each row in df_unique
-for index, row in df_unique.iterrows():
-    name = row['Name']  # Assuming 'Name' is a column in your DataFrame
-    distance = row['Distance']  # Assuming 'Distance' is a column in your DataFrame
-    lat, lon = row['lat'], row['lon']
+        # Add markers to the map with the dynamic popup
+        folium.Marker(
+            location=[row['Latitude'], row['Longitude']],
+            popup=popup_text,
+            icon=None  # You can customize the icon if needed
+        ).add_to(marker_cluster)
 
-    # Concatenate name and distance for the popup
-    popup_content = f"{name} - {distance} miles"
-
-    # Add a marker with a pop-up showing the name and distance
-    folium.Marker(location=[lat, lon], popup=popup_content).add_to(map_with_markers)
-
-# Display the Folium map using stfolium
-st.write("Map with Markers:")
-folium_static(map_with_markers)
-
+    # Display the Folium map using stfolium
+    st.write("Map with Markers:")
+    folium_static(map_with_markers)
+    
 ##----------------------------------------------------------------
 ##----------------------------------------------------------------
 
@@ -186,4 +204,3 @@ st.markdown("""
 
 # Add empty space below the copyright notice
 st.empty()
-
