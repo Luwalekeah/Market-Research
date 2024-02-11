@@ -102,12 +102,6 @@ with open(css_file) as f:
 # Streamlit app
 st.title("Google Maps Places Search")
 
-# Check if API key is set as an environment variable
-if GOOGLE_MAPS_API_KEY is None:
-    st.warning("Warning: Google Maps API key is not set. Please set it as an environment variable named 'GOOGLE_MAPS_API_KEY'")
-else:
-    st.info("Google Maps API key is set.")
-
 location = st.text_input("Enter your location (address, city, etc.):")
 distance = st.slider("Choose the search distance in miles:", min_value=1.0, max_value=50.0, step=1.0)
 place_types = st.text_input("Enter a comma-separated list of place types (e.g., gym, nursing_home, restaurant):").lower()
@@ -120,17 +114,17 @@ if GOOGLE_MAPS_API_KEY:
     all_places = find_places(GOOGLE_MAPS_API_KEY, location, distance, place_types_list)
 
     # Create DataFrame from the combined results
-    df = pd.DataFrame(all_places)
+    df_unique = pd.DataFrame(all_places)
 
     # Filter the DataFrame to keep only unique places based on 'Place_ID'
-    df_unique = df.drop_duplicates(subset='Place_ID')
+    df_unique = df_unique.drop_duplicates(subset='Place_ID')
 
     # Sort the DataFrame by 'Distance' in ascending order
     df_unique = df_unique[df_unique['Distance'] <= distance].sort_values(by='Distance')
 
     # Display the results
-    st.write(f"Results for {location}")
-    st.write(df_unique)
+    # st.write(f"Results for {location}")
+    # st.write(df_unique)
 
 
 ##----------------------------------------------------------------
@@ -166,4 +160,27 @@ if GOOGLE_MAPS_API_KEY:
 #     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 #     key="streamlit_download_button"
 # )
+
+#----------------------------------------------------------------
+#----------------------------------------------------------------
+#----------------------------------------------------------------
+# ... (your existing code)
+
+# Display the results
+st.write(f"Results for {location}")
+st.write(df_unique)
+
+# Add empty space above and below the copyright notice
+st.empty()
+
+# Centered copyright notice and link to GitHub
+st.markdown("""
+    <div style="display: flex; justify-content: center; text-align: center;">
+        <p>Copyright © 2024 Luwalekeah. 
+        <a href="https://github.com/Luwalekeah" target="_blank">GitHub</a></p>
+    </div>
+""", unsafe_allow_html=True)
+
+# Add empty space below the copyright notice
+st.empty()
 
