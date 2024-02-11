@@ -1,5 +1,5 @@
 import os
-import io
+from io import StringIO
 import base64
 import folium
 import googlemaps
@@ -142,32 +142,31 @@ folium_static(map_with_markers)
 # Download button for Excel file
 output_file = 'MarketResearch.xlsx'
 
-# Create a BytesIO buffer to hold the Excel file data
-excel_buffer = io.BytesIO()
+# Create a StringIO buffer to hold the Excel file data
+excel_buffer = StringIO()
 
-# Write the DataFrame to the BytesIO buffer
+# Write the DataFrame to the StringIO buffer
 with pd.ExcelWriter(excel_buffer, engine='openpyxl', options={'strings_to_numbers': True}) as writer:
     df_unique.to_excel(writer, index=False)
 
 # Get the Excel file data as bytes
-excel_bytes = excel_buffer.getvalue()
+excel_bytes = excel_buffer.getvalue().encode('utf-8')
 
 # Split the layout into columns
-columns = st.columns(3)
+columns = st.columns(5)
 
 # Add dummy columns if needed (skip if not required)
-for _ in range(1):
+for _ in range(2):
     columns[0].text("")  # Add empty content to the first two columns
 
 # Display a Streamlit download button in the third column (optional)
-columns[1].download_button(
+columns[2].download_button(
     label="Download Excel File",
     data=excel_bytes,
     file_name=output_file,
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     key="streamlit_download_button"
 )
-
 
 
 
