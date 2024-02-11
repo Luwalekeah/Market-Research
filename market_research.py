@@ -55,7 +55,7 @@ def find_places(api_key, location, distance, place_types):
             # Check if the distance is within the specified search distance
             if distance_miles <= distance:
                 # Place Details request to get additional information
-                details_result = gmaps.place(place['place_id'], fields=['formatted_phone_number', 'current_opening_hours', 'website', 'user_ratings_total', 'rating'])
+                details_result = gmaps.place(place['place_id'], fields=['formatted_phone_number', 'opening_hours', 'website', 'user_ratings_total', 'rating'])
 
                 # Extract the primary type (first element in the types array)
                 primary_type = place.get('types', [])[0] if place.get('types', []) else ''
@@ -138,9 +138,10 @@ if GOOGLE_MAPS_API_KEY:
     for index, row in df_unique.iterrows():
         # Dynamic popup text for each marker
         popup_text = f"<div style='white-space: nowrap;'><b>{row['Name']}</b><br>" \
-                     f"Opening Hours: {row['Opening_Hours']}<br>" \
-                     f"Rating: {row.get('Rating', 'N/A')}<br>" \
                      f"Distance: {row['Distance']} miles</div>"
+                    #  f"Opening Hours: {row['Opening_Hours']}<br>" \ #------>Taking this out since im not able to accurately get them from the places API
+                    #  f"Rating: {row.get('Rating', 'N/A')}<br>" \ #------>Taking this out since im not able to accurately get them from the places API
+
 
         # Add markers to the map with the dynamic popup
         folium.Marker(
