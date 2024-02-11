@@ -7,6 +7,8 @@ from pathlib import Path
 import base64
 import io
 from dotenv import load_dotenv
+import folium
+from streamlit_folium import folium_static
 
 # Load environment variables from .env file
 load_dotenv()
@@ -24,16 +26,6 @@ GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY")
 
 def calculate_distance(origin, destination):
     return geodesic(origin, destination).miles
-
-def extract_phone(place):
-    return place.get('formatted_phone_number', '') or place.get('international_phone_number', '') or place.get('plus_code', '')
-
-def extract_opening_hours(place):
-    periods = place.get('opening_hours', {}).get('periods', [])
-    if periods:
-        return [period.get('open', {}).get('time') for period in periods]
-    else:
-        return place.get('opening_hours', {}).get('weekday_text', [])
 
 def find_places(api_key, location, distance, place_types):
     gmaps = googlemaps.Client(key=api_key)
@@ -62,27 +54,18 @@ def find_places(api_key, location, distance, place_types):
 
             # Check if the distance is within the specified search distance
             if distance_miles <= distance:
-                # Extract phone number information
-                phone_number = extract_phone(place)
-
-                # Extract opening hours information
-                opening_hours = extract_opening_hours(place)
-
                 # Extract the primary type (first element in the types array)
                 primary_type = place.get('types', [])[0] if place.get('types', []) else ''
 
-                # Extract website URL
-                website_url = place.get('url', '')
-
+                # Create a simplified place_info dictionary without phone, website, and opening hours
                 place_info = {
                     'Place_ID': place['place_id'],
                     'Name': place['name'],
                     'Address': place.get('formatted_address', ''),
                     'Type': primary_type,
                     'Distance': round(distance_miles, 2),
-                    'Phone': phone_number,
-                    'Website': website_url,
-                    'Opening_Hours': opening_hours                    
+                    'Latitude': place_location[0],
+                    'Longitude': place_location[1],
                 }
 
                 places.append(place_info)
@@ -116,59 +99,79 @@ if GOOGLE_MAPS_API_KEY:
     # Create DataFrame from the combined results
     df_unique = pd.DataFrame(all_places)
 
+    # Rename columns to match the expected names for latitude and longitude
+    df_unique.rename(columns={'Latitude': 'lat', 'Longitude': 'lon'}, inplace=True)
+
     # Filter the DataFrame to keep only unique places based on 'Place_ID'
     df_unique = df_unique.drop_duplicates(subset='Place_ID')
 
     # Sort the DataFrame by 'Distance' in ascending order
     df_unique = df_unique[df_unique['Distance'] <= distance].sort_values(by='Distance')
 
-    # Display the results
-    # st.write(f"Results for {location}")
-    # st.write(df_unique)
-
-
-##----------------------------------------------------------------
-##----------------------------------------------------------------
-
-
-# # Download button for Excel file
-# output_file = 'MarketResearch.xlsx'
-
-# # Create a BytesIO buffer to hold the Excel file data
-# excel_buffer = io.BytesIO()
-
-# # Use pd.ExcelWriter as a context manager to write the DataFrame to the buffer
-# with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
-#     df_unique.to_excel(writer, index=False)
-
-# # Get the Excel file data as bytes
-# excel_bytes = excel_buffer.getvalue()
-
-# # Split the layout into columns
-# columns = st.columns(5)
-
-# # Add dummy columns if needed (skip if not required)
-# for _ in range(2):
-#     columns[0].text("")  # Add empty content to the first two columns
-
-
-# # Display a Streamlit download button in the third column (optional)
-# columns[2].download_button(
-#     label="Download Excel File",
-#     data=excel_bytes,
-#     file_name=output_file,
-#     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-#     key="streamlit_download_button"
-# )
 
 #----------------------------------------------------------------
 #----------------------------------------------------------------
-#----------------------------------------------------------------
-# ... (your existing code)
 
 # Display the results
 st.write(f"Results for {location}")
 st.write(df_unique)
+
+# Create a Folium map with markers based on the 'latitude' and 'longitude' columns in df_unique
+map_with_markers = folium.Map(location=[df_unique['lat'].mean(), df_unique['lon'].mean()], zoom_start=10)
+
+# Add markers to the map for each row in df_unique
+for index, row in df_unique.iterrows():
+    name = row['Name']  # Assuming 'Name' is a column in your DataFrame
+    distance = row['Distance']  # Assuming 'Distance' is a column in your DataFrame
+    lat, lon = row['lat'], row['lon']
+
+    # Concatenate name and distance for the popup
+    popup_content = f"{name} - {distance} miles"
+
+    # Add a marker with a pop-up showing the name and distance
+    folium.Marker(location=[lat, lon], popup=popup_content).add_to(map_with_markers)
+
+# Display the Folium map using stfolium
+st.write("Map with Markers:")
+folium_static(map_with_markers)
+
+##----------------------------------------------------------------
+##----------------------------------------------------------------
+
+
+# Download button for Excel file
+output_file = 'MarketResearch.xlsx'
+
+# Create a BytesIO buffer to hold the Excel file data
+excel_buffer = io.BytesIO()
+
+# Use pd.ExcelWriter as a context manager to write the DataFrame to the buffer
+with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
+    df_unique.to_excel(writer, index=False)
+
+# Get the Excel file data as bytes
+excel_bytes = excel_buffer.getvalue()
+
+# Split the layout into columns
+columns = st.columns(5)
+
+# Add dummy columns if needed (skip if not required)
+for _ in range(2):
+    columns[0].text("")  # Add empty content to the first two columns
+
+
+# Display a Streamlit download button in the third column (optional)
+columns[2].download_button(
+    label="Download Excel File",
+    data=excel_bytes,
+    file_name=output_file,
+    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    key="streamlit_download_button"
+)
+
+#----------------------------------------------------------------
+#----------------------------------------------------------------
+
 
 # Add empty space above and below the copyright notice
 st.empty()
