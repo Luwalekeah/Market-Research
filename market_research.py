@@ -6,7 +6,10 @@ from geopy.distance import geodesic
 from pathlib import Path
 import base64
 import io
-s
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # --- PATH SETTINGS ---
 current_dir = Path(__file__).parent if "__file__" in locals() else Path.cwd()
