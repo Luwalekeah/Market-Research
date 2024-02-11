@@ -1,13 +1,13 @@
 import os
-import streamlit as st
+import io
+import base64
+import folium
 import googlemaps
 import pandas as pd
-from geopy.distance import geodesic
+import streamlit as st
 from pathlib import Path
-import base64
-import io
 from dotenv import load_dotenv
-import folium
+from geopy.distance import geodesic
 from streamlit_folium import folium_static
 
 # Load environment variables from .env file
