@@ -25,3 +25,7 @@ hr {
 #MainMenu {visibility: hidden;}
 footer {visibility: hidden;}
 header {visibility: hidden;}
+
+.custom-expander {
+    margin-bottom: 0px !important;
+}

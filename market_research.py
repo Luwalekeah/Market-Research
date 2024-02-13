@@ -130,13 +130,14 @@ st.markdown("<h1 style='text-align: center;'>Find Nearby Places</h1>", unsafe_al
 st.write("\n")
 
 # Banner below the title
-st.markdown("<div style='text-align: center; background-color: white; padding: 10px; border: 2px solid #B87333; border-radius: 5px; font-weight: bold; color: black;'>Error(s) resolves with input of address and place type.</div>", unsafe_allow_html=True)
+# st.markdown("<div style='text-align: center; background-color: white; padding: 10px; border: 2px solid #B87333; border-radius: 5px; font-weight: bold; color: black;'>Error(s) resolves with input of address and place type.</div>", unsafe_allow_html=True)
+
 # adding some spacing
-st.write("\n")
+# st.write("\n")
 st.write("\n")
 
 
-location_default = "Denver Union Station"
+location_default = "Denver"
 help_text = "Location to search near: \n\n Your Current Location \n\n Place: Disney Land \n\n ZipCode: 80170\n\nCity: Ibiza"
 location = st.text_input("Location (address, city, etc.):", location_default, help=help_text)
 if not location:
@@ -249,6 +250,45 @@ if GOOGLE_MAPS_API_KEY:
     # Display the Folium map using stfolium
     st.write("Map with Markers:")
     folium_static(map_with_markers)
+
+#----------------------------------------------------------------
+# ---------------------------------------------------------------
+
+# Info section for the purpose of the app
+with st.expander("Overview"):
+    st.write("You're about to embark on a journey of exploration with the 'Find Nearby Places' app. Imagine having the power to discover hidden gems around you. You simply tell the app where you are or want to explore, set the distance you're willing to travel, and pick the types of places you're interested in. The app then uses its magic to fetch all the relevant information for you.")
+
+# Info section for location
+with st.expander("Usage"):
+    st.write("1. **Tell Me Where:** You start by telling the app where you want to find places – whether it's your current location, a specific address, or your favorite city. It's all about making this experience personalized just for you.")
+    st.write("2. **How Far?:** Using a slider, you get to decide how far you're willing to venture. Want places within a short stroll or a bit farther away? It's up to you! You're in control of your exploration radius.")
+    st.write("3. **What Are You in the Mood For?:** Next, you let the app know what you're in the mood for. Fancy a good meal, a workout, or maybe a peaceful park? Just type it in, separated by commas. The app understands your preferences.")
+    st.write("4. **Results at Your Fingertips:** You instantly see the results – neatly organized in a table. You get details like the name of the place, its type, distance from your specified location, and even ratings from fellow explorers like yourself.")
+    st.write("5. **See it on the Map:** For a visual treat, the app plots your discoveries on a map. It's like a virtual tour guide, showing you exactly where each place is located. Explore with your eyes before you go explore in person.")
+    st.write("6. **Take It With You:** And guess what? You can even take these results with you! Click a button, and the app prepares an Excel file for you to keep. Perfect for planning or sharing your newfound treasures with friends.")
+    st.write("It's all about putting the adventure in your hands – where to go, what to discover, and how to make the most of your exploration. Happy exploring!")
+
+# Info section for potential errors
+with st.expander("Potential Errors"):
+    st.write("Here are some potential errors and how to handle them when using the 'Find Nearby Places' app:")
+    st.write("**1. No Nearby Places Found:** If there are no nearby places found based on your criteria, the app will not throw an error. Instead, it will display a message letting you know that no results were found. You might want to adjust your search parameters or try a different location.")
+    st.write("**2. Typing Error in Place Types:** Be careful when entering place types. If you accidentally leave a comma at the end of the last place type (e.g., 'gym,'), the app may interpret it as an additional empty place type, leading to unexpected results. Double-check your input and remove any trailing commas.")
+    st.write("**3. Invalid Location:** If you provide an invalid or non-existent location, the app will attempt to handle it gracefully. However, to ensure accurate results, it's recommended to enter a valid address, city, or location information.")
+    st.write("**5. Unexpected Network Issues:** In the case of unexpected network issues or disruptions in accessing the Google Maps API, the app will display a warning message. You may want to check your internet connection or try again later.")
+    st.write("By being aware of these potential scenarios, you can enhance your experience with the app and ensure smooth exploration.")
+
+# Info section for feature updates
+with st.expander("Feature Updates"):
+    st.write("Exciting updates are in the pipeline for the 'Find Nearby Places' app. Here's what you can look forward to in future releases:")
+    st.write("**1. Automatic Location Detection:** Soon, the app will prompt you to share your current location. This will automatically set the search area, making it even easier for you to find nearby places without manually entering your location.")
+    st.write("**2. Enhanced Place Details:** Get more information about the places you discover. The upcoming update will include phone numbers, website links, and whether a place is currently open or closed. It's all about providing you with the details you need at your fingertips.")
+    st.write("**3. Open Now Filter:** Customize your search by only displaying places that are open now. This feature will help you find the perfect spot that fits your current schedule or preferences.")
+    st.write("**4. Improved Input Handling:** Say goodbye to unnecessary spaces and commas! The app will intelligently handle input, removing extra spaces in place names and trimming any trailing commas in your specified place types.")
+    st.write("**5. User Accounts:** Soon, you'll have the option to create a user account. By logging in, you can save your favorite searches, making it convenient to revisit and plan future explorations. Your personalized experience is just a login away!")
+    st.write("We're committed to continuously enhancing your experience with the app. Stay tuned for these exciting updates, and happy exploring!")
+
+#----------------------------------------------------------------
+# ---------------------------------------------------------------
 
 # Add empty space above and below the copyright notice
 st.empty()
