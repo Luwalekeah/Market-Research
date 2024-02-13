@@ -9,6 +9,7 @@ import streamlit as st
 from pathlib import Path
 from dotenv import load_dotenv
 from geopy.distance import geodesic
+from geopy.geocoders import Nominatim
 from folium.plugins import MarkerCluster
 from streamlit_folium import folium_static
 
@@ -21,7 +22,7 @@ current_dir = Path(__file__).parent if "__file__" in locals() else Path.cwd()
 css_file = current_dir / "styles" / "main.css"
 
 # --- GENERAL SETTINGS ---
-PAGE_TITLE = "Search Nearby Places"
+PAGE_TITLE = "Find Nearby Places"
 PAGE_ICON = ":Round Pushpin:"
 st.set_page_config(page_title=PAGE_TITLE, page_icon=PAGE_ICON)
 
@@ -124,20 +125,57 @@ with open(css_file) as f:
     st.markdown("<style>{}</style>".format(f.read()), unsafe_allow_html=True)
 
 # Streamlit app Begins
-st.markdown("<h1 style='text-align: center;'>Google Maps Places Search</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center;'>Find Nearby Places</h1>", unsafe_allow_html=True)
 
 # adding some spacing
 st.write("\n")
 
 # Banner below the title
-st.markdown("<div style='text-align: center; background-color: white; padding: 10px; border: 2px solid red; border-radius: 5px; font-weight: bold; color: black;'>Error(s) resolves with input of address and place type.</div>", unsafe_allow_html=True)
+st.markdown("<div style='text-align: center; background-color: white; padding: 10px; border: 2px solid #B87333; border-radius: 5px; font-weight: bold; color: black;'>Error(s) resolves with input of address and place type.</div>", unsafe_allow_html=True)
 # adding some spacing
 st.write("\n")
+st.write("\n")
+
+# Get the user's current location using geopy
+geolocator = Nominatim(user_agent = "Find Nearby Places (Luwalekeah; luwahb@gmail.com)"
+)  # Provide a unique user agent
+user_location = st.empty()
+
+try:
+    location_info = geolocator.geocode(" ")
+    user_location = st.location_request(label="Allow access to your location")
+except Exception as e:
+    st.warning("Unable to retrieve user's location. Using default location.")
+    location_info = geolocator.geocode("Denver Union Station")
+
+# Use the user's current location if available, otherwise use Denver Union Station as the default
+default_location = f"{location_info.latitude}, {location_info.longitude}" if location_info else "Denver Union Station"
+location = st.text_input("Location (address, city, etc.):", default_location)
 
 
-location = st.text_input("Enter your location (address, city, etc.):")
-distance = st.slider("Choose the search distance in miles:", min_value=1.0, max_value=50.0, step=1.0)
-place_types = st.text_input("Enter a comma-separated list of place types (e.g., gym, nursing_home, restaurant):").lower()
+# adding some spacing
+st.write("\n")
+st.write("\n")
+
+distance = st.slider("Distance:", min_value=1.0, max_value=50.0, step=1.0)
+
+# adding some spacing
+st.write("\n")
+st.write("\n")
+
+# Check if the session state has been initialized
+if 'default_place_type' not in st.session_state:
+    st.session_state.default_place_type = 'gas'
+
+# Use st.session_state to persist the input state across reruns
+place_types = st.text_input("Place(s) to find (e.g., gym, nursing_home, restaurant):", st.session_state.default_place_type).lower()
+
+# Update the session state with the entered place_types
+st.session_state.default_place_type = place_types
+
+
+# adding some spacing
+st.write("\n")
 
 # Convert place types to a list
 place_types_list = [place_type.strip() for place_type in place_types.split(',')]
@@ -155,8 +193,12 @@ if GOOGLE_MAPS_API_KEY:
     # Sort the DataFrame by 'Distance' in ascending order
     df_unique = df_unique[df_unique['Distance'] <= distance].sort_values(by='Distance')
     
+    # add spacing
+    st.empty()
+    st.empty()
+    
     # Notify user of csv export cability
-    st.markdown("<p style='text-align: center; color: red; font-style: italic;'>Want to export data to CSV or enlarge: click top-right corner of the table.</p>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center; color: #B87333; font-style: italic;'>Want to export data to CSV or enlarge: click top-right corner of the table.</p>", unsafe_allow_html=True)
 
     # Display the results
     st.write(f"Results for {location}")
@@ -218,6 +260,10 @@ if GOOGLE_MAPS_API_KEY:
 
     #----------------------------------------------------------------
     #----------------------------------------------------------------
+    
+    # add spacing
+    st.empty()
+    st.empty()
 
     # Display the Folium map using stfolium
     st.write("Map with Markers:")
@@ -227,6 +273,7 @@ if GOOGLE_MAPS_API_KEY:
 #----------------------------------------------------------------
 
 # Add empty space above and below the copyright notice
+st.empty()
 st.empty()
 
 # Centered copyright notice and link to GitHub
