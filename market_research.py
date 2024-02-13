@@ -165,7 +165,7 @@ output_file = 'MarketResearch.xlsx'
 excel_buffer = io.BytesIO()
 
 # Use pd.ExcelWriter as a context manager to write the DataFrame to the buffer
-with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
+with pd.ExcelWriter(excel_buffer, engine='xlsxwriter') as writer:
     df_unique.to_excel(writer, index=False)
 
 # Get the Excel file data as bytes
@@ -178,7 +178,6 @@ columns = st.columns(3)
 for _ in range(1):
     columns[0].text("")  # Add empty content to the first two columns
 
-
 # Display a Streamlit download button in the third column (optional)
 columns[1].download_button(
     label="Download Excel File",
@@ -187,6 +186,7 @@ columns[1].download_button(
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     key="streamlit_download_button"
 )
+
 
 #----------------------------------------------------------------
 #----------------------------------------------------------------
