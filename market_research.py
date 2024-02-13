@@ -135,7 +135,7 @@ st.markdown("<div style='text-align: center; background-color: white; padding: 1
 st.write("\n")
 st.write("\n")
 
-location = st.text_input("Enter your location (address, city, etc.):", "Denver Union Station")
+location = st.text_input("Enter your location (address, city, etc.):", "Vail")
 
 # adding some spacing
 st.write("\n")
