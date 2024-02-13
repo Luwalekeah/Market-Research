@@ -11,7 +11,9 @@ from dotenv import load_dotenv
 from geopy.distance import geodesic
 from geopy.geocoders import Nominatim
 from folium.plugins import MarkerCluster
+from streamlit.components.v1 import html
 from streamlit_folium import folium_static
+
 
 
 # Load environment variables from .env file
@@ -136,22 +138,37 @@ st.markdown("<div style='text-align: center; background-color: white; padding: 1
 st.write("\n")
 st.write("\n")
 
-# Get the user's current location using geopy
-geolocator = Nominatim(user_agent = "Find Nearby Places (Luwalekeah; luwahb@gmail.com)"
-)  # Provide a unique user agent
-user_location = st.empty()
 
-try:
-    location_info = geolocator.geocode(" ")
-    user_location = st.location_request(label="Allow access to your location")
-except Exception as e:
-    st.warning("Unable to retrieve user's location. Using default location.")
-    location_info = geolocator.geocode("Denver Union Station")
+# Get the user's current location using geopy
+#geolocator = Nominatim(user_agent="Find Nearby Places (Luwalekeah; luwahb@gmail.com)")  # Provide a unique user agent
+
+#--------------------------------
+
+# Get the user's current location using geopy
+geolocator = Nominatim(user_agent="your_app_name")  # Provide a unique user agent
+
+# Shared variable to store user's location
+user_location_shared = st.session_state['user_location'] if 'user_location' in st.session_state else None
+
+# Button to trigger geolocation
+if st.button("Use My Current Location"):
+    try:
+        location_info = geolocator.geocode(" ")
+        user_location_shared = [location_info.latitude, location_info.longitude]
+        st.session_state['user_location'] = user_location_shared
+    except Exception as e:
+        st.warning("Unable to retrieve user's location. You can enter your location manually.")
+        location_info = geolocator.geocode("Denver Union Station")
+        user_location_shared = [location_info.latitude, location_info.longitude]
+        st.session_state['user_location'] = user_location_shared
 
 # Use the user's current location if available, otherwise use Denver Union Station as the default
-default_location = f"{location_info.latitude}, {location_info.longitude}" if location_info else "Denver Union Station"
+default_location = f"{user_location_shared[0]}, {user_location_shared[1]}" if user_location_shared else "Denver Union Station"
 location = st.text_input("Location (address, city, etc.):", default_location)
 
+# Display user's location
+if user_location_shared:
+    st.write("Your location: Latitude {}, Longitude {}".format(user_location_shared[0], user_location_shared[1]))
 
 # adding some spacing
 st.write("\n")
