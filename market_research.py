@@ -135,7 +135,14 @@ st.markdown("<div style='text-align: center; background-color: white; padding: 1
 st.write("\n")
 st.write("\n")
 
-location = st.text_input("Enter your location (address, city, etc.):", "Vail")
+
+location_default = "Denver Union Station"
+help_text = "Location to search near: \n\n Your Current Location \n\n Place: Disney Land \n\n ZipCode: 80170\n\nCity: Ibiza"
+location = st.text_input("Location (address, city, etc.):", location_default, help=help_text)
+if not location:
+    location = location_default
+
+
 
 # adding some spacing
 st.write("\n")
@@ -151,8 +158,9 @@ st.write("\n")
 if 'default_place_type' not in st.session_state:
     st.session_state.default_place_type = 'gas'
 
+help_places_txt = "Types of places to search for: \n\n food, gym, church, adult_day_care\n\n cocktail_lounge, university, food_truck, etc..."
 # Use st.session_state to persist the input state across reruns
-place_types = st.text_input("Place(s) to find (e.g., gym, nursing_home, restaurant):", st.session_state.default_place_type).lower()
+place_types = st.text_input("Place(s) to find:", st.session_state.default_place_type, help=help_places_txt).lower()
 
 # Update the session state with the entered place_types
 st.session_state.default_place_type = place_types
