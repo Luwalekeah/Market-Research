@@ -150,44 +150,47 @@ if GOOGLE_MAPS_API_KEY:
             popup=popup_text,
             icon=None  # You can customize the icon if needed
         ).add_to(marker_cluster)
+    
+    ##----------------------------------------------------------------
+    ##----------------------------------------------------------------
+
+    # Download button for Excel file
+    output_file = 'MarketResearch.xlsx'
+
+    # Create a BytesIO buffer to hold the Excel file data
+    excel_buffer = io.BytesIO()
+
+    # Use pd.ExcelWriter as a context manager to write the DataFrame to the buffer
+    with pd.ExcelWriter(excel_buffer, engine='xlsxwriter') as writer:
+        df_unique.to_excel(writer, index=False)
+
+    # Get the Excel file data as bytes
+    excel_bytes = excel_buffer.getvalue()
+
+    # Split the layout into columns
+    columns = st.columns(3)
+
+    # Add dummy columns if needed (skip if not required)
+    for _ in range(1):
+        columns[0].text("")  # Add empty content to the first two columns
+
+    # Display a Streamlit download button in the third column (optional)
+    columns[1].download_button(
+        label="Download Excel File",
+        data=excel_bytes,
+        file_name=output_file,
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        key="streamlit_download_button"
+    )
+
+
+    #----------------------------------------------------------------
+    #----------------------------------------------------------------
 
     # Display the Folium map using stfolium
     st.write("Map with Markers:")
     folium_static(map_with_markers)
     
-##----------------------------------------------------------------
-##----------------------------------------------------------------
-
-# Download button for Excel file
-output_file = 'MarketResearch.xlsx'
-
-# Create a BytesIO buffer to hold the Excel file data
-excel_buffer = io.BytesIO()
-
-# Use pd.ExcelWriter as a context manager to write the DataFrame to the buffer
-with pd.ExcelWriter(excel_buffer, engine='xlsxwriter') as writer:
-    df_unique.to_excel(writer, index=False)
-
-# Get the Excel file data as bytes
-excel_bytes = excel_buffer.getvalue()
-
-# Split the layout into columns
-columns = st.columns(3)
-
-# Add dummy columns if needed (skip if not required)
-for _ in range(1):
-    columns[0].text("")  # Add empty content to the first two columns
-
-# Display a Streamlit download button in the third column (optional)
-columns[1].download_button(
-    label="Download Excel File",
-    data=excel_bytes,
-    file_name=output_file,
-    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    key="streamlit_download_button"
-)
-
-
 #----------------------------------------------------------------
 #----------------------------------------------------------------
 
