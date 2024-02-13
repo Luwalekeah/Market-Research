@@ -14,8 +14,6 @@ from folium.plugins import MarkerCluster
 from streamlit.components.v1 import html
 from streamlit_folium import folium_static
 
-
-
 # Load environment variables from .env file
 load_dotenv()
 
@@ -121,7 +119,6 @@ def find_places(api_key, location, distance, place_types):
 
     return all_places
 
-
 # --- LOAD CSS ---
 with open(css_file) as f:
     st.markdown("<style>{}</style>".format(f.read()), unsafe_allow_html=True)
@@ -138,37 +135,51 @@ st.markdown("<div style='text-align: center; background-color: white; padding: 1
 st.write("\n")
 st.write("\n")
 
-
-# Get the user's current location using geopy
-#geolocator = Nominatim(user_agent="Find Nearby Places (Luwalekeah; luwahb@gmail.com)")  # Provide a unique user agent
-
-#--------------------------------
-
 # Get the user's current location using geopy
 geolocator = Nominatim(user_agent="your_app_name")  # Provide a unique user agent
+user_location = st.empty()
 
-# Shared variable to store user's location
-user_location_shared = st.session_state['user_location'] if 'user_location' in st.session_state else None
-
-# Button to trigger geolocation
-if st.button("Use My Current Location"):
-    try:
-        location_info = geolocator.geocode(" ")
-        user_location_shared = [location_info.latitude, location_info.longitude]
-        st.session_state['user_location'] = user_location_shared
-    except Exception as e:
-        st.warning("Unable to retrieve user's location. You can enter your location manually.")
-        location_info = geolocator.geocode("Denver Union Station")
-        user_location_shared = [location_info.latitude, location_info.longitude]
-        st.session_state['user_location'] = user_location_shared
+try:
+    location_info = geolocator.geocode(" ")
+    user_location = st.text("Your location: {}".format(location_info.address.split(",")[0].strip()))  # Extract only the name
+except Exception as e:
+    st.warning("Unable to retrieve user's location. You can enter your location manually.")
+    location_info = geolocator.geocode("Denver Union Station")
 
 # Use the user's current location if available, otherwise use Denver Union Station as the default
-default_location = f"{user_location_shared[0]}, {user_location_shared[1]}" if user_location_shared else "Denver Union Station"
+default_location = location_info.address.split(",")[0].strip() if location_info else "Denver Union Station"
 location = st.text_input("Location (address, city, etc.):", default_location)
 
-# Display user's location
-if user_location_shared:
-    st.write("Your location: Latitude {}, Longitude {}".format(user_location_shared[0], user_location_shared[1]))
+# ...
+
+# Initialize session state variables
+if 'user_location' not in st.session_state:
+    st.session_state.user_location = None
+
+# Insert JavaScript code to prompt for location
+html(
+    """
+    <script>
+    if ("geolocation" in navigator) {
+        navigator.geolocation.getCurrentPosition(
+            function(position) {
+                Shiny.setInputValue('user_location', [position.coords.latitude, position.coords.longitude]);
+            },
+            function(error) {
+                Shiny.setInputValue('user_location', null);
+            }
+        );
+    } else {
+        Shiny.setInputValue('user_location', null);
+    }
+    </script>
+    """
+)
+
+# Retrieve user's location from JavaScript and update the user_location variable
+user_location_js = st.session_state.user_location
+if user_location_js:
+    user_location.text("Your location: {}".format(user_location_js[0]))  # Display only the location name
 
 # adding some spacing
 st.write("\n")
@@ -190,7 +201,6 @@ place_types = st.text_input("Place(s) to find (e.g., gym, nursing_home, restaura
 # Update the session state with the entered place_types
 st.session_state.default_place_type = place_types
 
-
 # adding some spacing
 st.write("\n")
 
@@ -209,12 +219,12 @@ if GOOGLE_MAPS_API_KEY:
 
     # Sort the DataFrame by 'Distance' in ascending order
     df_unique = df_unique[df_unique['Distance'] <= distance].sort_values(by='Distance')
-    
+
     # add spacing
     st.empty()
     st.empty()
-    
-    # Notify user of csv export cability
+
+    # Notify user of csv export capability
     st.markdown("<p style='text-align: center; color: #B87333; font-style: italic;'>Want to export data to CSV or enlarge: click top-right corner of the table.</p>", unsafe_allow_html=True)
 
     # Display the results
@@ -231,9 +241,6 @@ if GOOGLE_MAPS_API_KEY:
         # Dynamic popup text for each marker
         popup_text = f"<div style='white-space: nowrap;'><b>{row['Name']}</b><br>" \
                      f"Distance: {row['Distance']} miles</div>"
-                    #  f"Opening Hours: {row['Opening_Hours']}<br>" \ #------>Taking this out since im not able to accurately get them from the places API
-                    #  f"Rating: {row.get('Rating', 'N/A')}<br>" \ #------>Taking this out since im not able to accurately get them from the places API
-
 
         # Add markers to the map with the dynamic popup
         folium.Marker(
@@ -241,9 +248,6 @@ if GOOGLE_MAPS_API_KEY:
             popup=popup_text,
             icon=None  # You can customize the icon if needed
         ).add_to(marker_cluster)
-    
-    ##----------------------------------------------------------------
-    ##----------------------------------------------------------------
 
     # Download button for Excel file
     output_file = 'MarketResearch.xlsx'
@@ -274,10 +278,6 @@ if GOOGLE_MAPS_API_KEY:
         key="streamlit_download_button"
     )
 
-
-    #----------------------------------------------------------------
-    #----------------------------------------------------------------
-    
     # add spacing
     st.empty()
     st.empty()
@@ -285,9 +285,6 @@ if GOOGLE_MAPS_API_KEY:
     # Display the Folium map using stfolium
     st.write("Map with Markers:")
     folium_static(map_with_markers)
-    
-#----------------------------------------------------------------
-#----------------------------------------------------------------
 
 # Add empty space above and below the copyright notice
 st.empty()
