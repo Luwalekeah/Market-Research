@@ -1,15 +1,17 @@
 import os
 import io
-import streamlit as st
-import googlemaps
-import pandas as pd
-from geopy.distance import geodesic
-from pathlib import Path
+import time
 import base64
 import folium
+import googlemaps
+import pandas as pd
+import streamlit as st
+from pathlib import Path
+from dotenv import load_dotenv
+from geopy.distance import geodesic
 from folium.plugins import MarkerCluster
 from streamlit_folium import folium_static
-from dotenv import load_dotenv
+
 
 # Load environment variables from .env file
 load_dotenv()
@@ -36,56 +38,86 @@ def find_places(api_key, location, distance, place_types):
     lat_lng = geocode_result[0]['geometry']['location']
 
     all_places = []
+    total_all_places_count = 0  # Initialize the total count across all place types
 
     for place_type in place_types:
-        # Places API text search for each place type
-        places_result = gmaps.places(
-            query=place_type,
-            location=lat_lng,
-            radius=distance * 1609.34,  # Convert miles to meters
-            open_now=False
-        )
+        next_page_token = None
+        total_places_count = 0  # Initialize the count for each place type
 
-        places = []
+        while True:
+            # Display loading spinner with custom style
+            with st.spinner('Loading More Places...'):
+                # Places API text search for each place type with the current next_page_token
+                places_result = gmaps.places(
+                    query=place_type,
+                    location=lat_lng,
+                    radius=distance * 1609.34,  # Convert miles to meters
+                    open_now=False,
+                    page_token=next_page_token
+                )
 
-        for place in places_result['results']:
-            # Calculate the distance from the provided location in miles
-            place_location = (place['geometry']['location']['lat'], place['geometry']['location']['lng'])
-            distance_miles = calculate_distance((lat_lng['lat'], lat_lng['lng']), place_location)
+                places = []
 
-            # Check if the distance is within the specified search distance
-            if distance_miles <= distance:
-                # Place Details request to get additional information
-                details_result = gmaps.place(place['place_id'], fields=['formatted_phone_number', 'opening_hours', 'website', 'user_ratings_total', 'rating'])
+                for place in places_result.get('results', []):
+                    # Calculate the distance from the provided location in miles
+                    place_location = (place['geometry']['location']['lat'], place['geometry']['location']['lng'])
+                    distance_miles = calculate_distance((lat_lng['lat'], lat_lng['lng']), place_location)
 
-                # Extract the primary type (first element in the types array)
-                primary_type = place.get('types', [])[0] if place.get('types', []) else ''
+                    # Check if the distance is within the specified search distance
+                    if distance_miles <= distance:
+                        # Place Details request to get additional information
+                        details_result = gmaps.place(place_id=place['place_id'],
+                                                     fields=['formatted_phone_number', 'opening_hours', 'website',
+                                                             'user_ratings_total', 'rating'])
 
-                # Create a simplified place_info dictionary with additional details
-                place_info = {
-                    'Place_ID': place['place_id'],
-                    'Name': place['name'],
-                    'Address': place.get('formatted_address', ''),
-                    'Type': primary_type,
-                    'Distance': round(distance_miles, 2),
-                    'Phone': details_result.get('formatted_phone_number', ''),
-                    'Website': details_result.get('website', ''),
-                    'Opening_Hours': details_result.get('opening_hours', {}).get('weekday_text', ''),
-                    'Rating': details_result.get('rating', 'N/A'),
-                    'User_Ratings_Total': details_result.get('user_ratings_total', 'N/A'),
-                    'Latitude': place_location[0],
-                    'Longitude': place_location[1]
-                }
+                        # Extract the primary type (first element in the types array)
+                        primary_type = place.get('types', [])[0] if place.get('types', []) else ''
 
-                places.append(place_info)
+                        # Create a simplified place_info dictionary with additional details
+                        place_info = {
+                            'Place_ID': place['place_id'],
+                            'Name': place['name'],
+                            'Address': place.get('formatted_address', ''),
+                            'Type': primary_type,
+                            'Distance': round(distance_miles, 2),
+                            'Phone': details_result.get('formatted_phone_number', ''),
+                            'Website': details_result.get('website', ''),
+                            'Opening_Hours': details_result.get('opening_hours', {}).get('weekday_text', ''),
+                            'Rating': details_result.get('rating', 'N/A'),
+                            'User_Ratings_Total': details_result.get('user_ratings_total', 'N/A'),
+                            'Latitude': place_location[0],
+                            'Longitude': place_location[1]
+                        }
 
-        # Print the count of each type for each object
-        st.write(f"{place_type.capitalize()}: {len(places)}")
+                        places.append(place_info)
 
-        # Extend the list of all places with the places for the current type
-        all_places.extend(places)
+                # Extend the list of all places with the places for the current type
+                all_places.extend(places)
+
+                # Accumulate the count of places for the current type
+                total_places_count += len(places)
+
+                # Check if there is a next_page_token
+                next_page_token = places_result.get('next_page_token')
+
+                # Break the loop if there is no next_page_token
+                if not next_page_token:
+                    break
+
+                # Wait for a moment before making the next request (to avoid OVER_QUERY_LIMIT)
+                time.sleep(2)
+
+        # Print the total count of places for the current type after processing
+        st.write(f"{place_type.capitalize()}: {total_places_count}")
+
+        # Accumulate the total count across all place types
+        total_all_places_count += total_places_count
+
+    # Print the total count across all place types
+    st.write(f"Total: {total_all_places_count}")
 
     return all_places
+
 
 # --- LOAD CSS ---
 with open(css_file) as f:
@@ -193,7 +225,6 @@ if GOOGLE_MAPS_API_KEY:
     
 #----------------------------------------------------------------
 #----------------------------------------------------------------
-
 
 # Add empty space above and below the copyright notice
 st.empty()
