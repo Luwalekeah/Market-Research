@@ -139,6 +139,19 @@ st.write("\n")
 geolocator = Nominatim(user_agent="your_app_name")  # Provide a unique user agent
 user_location = st.empty()
 
+try:
+    location_info = geolocator.geocode(" ")
+    user_location = st.text("Your location: Latitude {}, Longitude {}".format(location_info.latitude, location_info.longitude))
+except Exception as e:
+    st.warning("Unable to retrieve user's location. You can enter your location manually.")
+    location_info = geolocator.geocode("Denver Union Station")
+
+# Use the user's current location if available, otherwise use Denver Union Station as the default
+default_location = f"{location_info.latitude}, {location_info.longitude}" if location_info else "Denver Union Station"
+location = st.text_input("Location (address, city, etc.):", default_location)
+
+# ...
+
 # Initialize session state variables
 if 'user_location' not in st.session_state:
     st.session_state.user_location = None
@@ -147,41 +160,26 @@ if 'user_location' not in st.session_state:
 html(
     """
     <script>
-    function getUserLocation() {
-        if ("geolocation" in navigator) {
-            navigator.geolocation.getCurrentPosition(
-                function(position) {
-                    Shiny.setInputValue('user_location', [position.coords.latitude, position.coords.longitude]);
-                },
-                function(error) {
-                    Shiny.setInputValue('user_location', null);
-                }
-            );
-        } else {
-            Shiny.setInputValue('user_location', null);
-        }
+    if ("geolocation" in navigator) {
+        navigator.geolocation.getCurrentPosition(
+            function(position) {
+                Shiny.setInputValue('user_location', [position.coords.latitude, position.coords.longitude]);
+            },
+            function(error) {
+                Shiny.setInputValue('user_location', null);
+            }
+        );
+    } else {
+        Shiny.setInputValue('user_location', null);
     }
     </script>
     """
 )
 
-# Button to trigger geolocation
-if st.button("Get My Location"):
-    st.write("Please allow access to your location.")
-    st.write("Once allowed, your location will be inserted into the search box.")
-    st.write("This may take a few seconds.")
-    st.write("Note: Some browsers may require the site to be served over HTTPS for geolocation to work.")
-
 # Retrieve user's location from JavaScript and update the user_location variable
 user_location_js = st.session_state.user_location
 if user_location_js:
-    user_location.text("Your location: {}".format(user_location_js[0]))  # Display only the location name
-
-    # Update the location variable with the new location
-    location = user_location_js[0]
-    st.text_input("Location (address, city, etc.):", location)
-else:
-    st.text_input("Location (address, city, etc.):", "Denver Union Station")
+    user_location.text("Your location: Latitude {}, Longitude {}".format(user_location_js[0], user_location_js[1]))
 
 # adding some spacing
 st.write("\n")
