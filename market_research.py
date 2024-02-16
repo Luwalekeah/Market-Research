@@ -3,6 +3,7 @@ import io
 import time
 import base64
 import folium
+import webbrowser
 import googlemaps
 import pandas as pd
 import streamlit as st
@@ -221,6 +222,7 @@ if GOOGLE_MAPS_API_KEY:
     st.write(f"Results for {location}")
 #----------------------------------------------------------------
 #----------------------------------------------------------------
+
     # Columns to exclude from the map-related columns
     map_related_columns = ['Name', 'Distance', 'Latitude', 'Longitude']
 
@@ -285,6 +287,34 @@ if GOOGLE_MAPS_API_KEY:
     st.write("\n")
     st.write(df_display)
     
+    # Function to generate Google Maps link for multiple locations
+    def generate_google_maps_link(addresses):
+        addresses_str = '|'.join([address.replace(' ', '+') for address in addresses])
+        return f"https://www.google.com/maps/search/?api=1&query={addresses_str}"
+
+    # Function to open all locations in a single Google Maps link
+    def open_in_google_maps():
+        addresses = df_display['Address'].tolist()
+        link = generate_google_maps_link(addresses)
+        webbrowser.open(link, new=2)
+
+    # Function to open a specific location in Google Maps
+    def open_single_location_in_google_maps(address):
+        link = generate_google_maps_link([address])
+        webbrowser.open(link, new=2)
+
+    st.write("\n")
+
+    # Add an expander with buttons for each place
+    with st.expander("Open Places in Google Maps"):
+            # Add a button to open all locations in Google Maps
+        if st.button("Open All in Google Maps"):
+            open_in_google_maps()
+        for index, row in df_display.iterrows():
+            button_label = f"{row['Name']} - {row.get('Distance', 'N/A')}"
+            if st.button(button_label):
+                open_single_location_in_google_maps(row['Address'])
+    st.write("\n")
 #----------------------------------------------------------------
 #----------------------------------------------------------------
 
