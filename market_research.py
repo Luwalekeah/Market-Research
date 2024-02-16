@@ -126,20 +126,27 @@ if 'first_time' not in st.session_state:
     # Display the welcome message with background color and wrapping
     welcome_message = """
     <div style="background-color: #87CEEB; padding: 10px; border-radius: 5px; margin-bottom: 10px;">
-        👋 Welcome! Default Entry: <b><i><span style='color:#B87333;'>Denver, gas</span></i></b>. Enter yours. For issues, check bottom of the app.
+        👋 Welcome! Default Entry: <b><i><span style='color:#B87333;'>Denver, gas</span></i></b>. Enter yours. For issues, check the bottom of the app.
     </div>
     """
     st.markdown(welcome_message, unsafe_allow_html=True)
 
-    # Add a button to close the message
-    close_button = st.button("Close")
+    # Split the layout into columns
+    columns = st.columns(5)
+
+    # Add dummy columns if needed (skip if not required)
+    for _ in range(3):
+        columns[0].text("")  # Add empty content to the first two columns
+
+    # Add a button to close the message in the middle column
+    close_button = columns[2].button("Close")
 
     # Check if the button is clicked
     if close_button:
         # Mark that the user has seen the popup
         st.session_state.first_time = True
         # Close the expander immediately
-        st.experimental_rerun()
+        st.rerun()
 
     
 # Streamlit app Begins
@@ -205,8 +212,7 @@ if GOOGLE_MAPS_API_KEY:
     df_display = df_display[df_display['Distance'] <= distance].sort_values(by='Distance')
 
     # add spacing
-    st.empty()
-    st.empty()
+    st.write("\n")
 
     # Notify user of csv export capability
     st.markdown("<p style='text-align: center; color: #B87333; font-style: italic;'>Want to export data to CSV or enlarge: click top-right corner of the table.</p>", unsafe_allow_html=True)
@@ -275,6 +281,8 @@ if GOOGLE_MAPS_API_KEY:
                 df_display = df_display[df_display[column].astype(str).str.contains(filter_value, case=False, na=False)]
 
     # Display the filtered DataFrame
+    st.write("\n")
+    st.write("\n")
     st.write(df_display)
     
 #----------------------------------------------------------------
