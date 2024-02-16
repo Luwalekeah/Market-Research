@@ -196,13 +196,13 @@ if GOOGLE_MAPS_API_KEY:
     all_places = find_places(GOOGLE_MAPS_API_KEY, location, distance, place_types_list)
 
     # Create DataFrame from the combined results
-    df_unique = pd.DataFrame(all_places)
+    df_display = pd.DataFrame(all_places)
 
     # Filter the DataFrame to keep only unique places based on 'Place_ID'
-    df_unique = df_unique.drop_duplicates(subset='Place_ID')
+    df_display = df_display.drop_duplicates(subset='Place_ID')
 
     # Sort the DataFrame by 'Distance' in ascending order
-    df_unique = df_unique[df_unique['Distance'] <= distance].sort_values(by='Distance')
+    df_display = df_display[df_display['Distance'] <= distance].sort_values(by='Distance')
 
     # add spacing
     st.empty()
@@ -213,38 +213,72 @@ if GOOGLE_MAPS_API_KEY:
 
     # Display the results
     st.write(f"Results for {location}")
-    
-    # Filter columns based on user input
-    selected_columns = st.multiselect("Select Columns to Display:", df_unique.columns)
-    
-    # Apply column filtering
-    df_display = df_unique[selected_columns]
-    
-    # Filter data in each column
-    for column in selected_columns:
-        filter_value = st.text_input(f"Filter by {column}:", "")
-        if filter_value:
-            df_display = df_display[df_display[column].astype(str).str.contains(filter_value, case=False, na=False)]
+#----------------------------------------------------------------
+#----------------------------------------------------------------
+    # Columns to exclude from the map-related columns
+    map_related_columns = ['Name', 'Distance', 'Latitude', 'Longitude']
 
+    # Additional text filters for columns not in map_related_columns
+    additional_text_filters = [col for col in df_display.columns if col not in map_related_columns]
+
+    # Initialize session state
+    if 'filter_all_columns' not in st.session_state:
+        st.session_state.filter_all_columns = True
+
+    # Create an expander for filters
+    with st.expander("Filters"):
+        # Buttons to remove all columns and add all columns
+        col1, col2 = st.columns(2)
+
+        with col1:
+            remove_all_button = st.button("Remove All Columns", key="remove_all_button", help="Click to remove all columns from the filter list.")
+            st.markdown("<style>div[data-testid='stButton'] {margin-left: 0%;}</style>", unsafe_allow_html=True)
+
+        with col2:
+            add_all_button = st.button("Add All Columns", key="add_all_button", help="Click to add all columns back to the filter list.")
+            st.markdown("<style>div[data-testid='stButton'] {margin-left: 25%;margin-right: 5%;}</style>", unsafe_allow_html=True)
+
+        if remove_all_button:
+            # Remove all columns from the filter list
+            selected_columns = [column for column in df_display.columns if column not in map_related_columns]
+        elif add_all_button:
+            # Add all columns back to the filter list
+            selected_columns = df_display.columns.tolist()
+        else:
+            # Default state for selected columns (map-related columns)
+            selected_columns = map_related_columns
+
+        # Create checkboxes for each column to control inclusion in text input filter
+        include_in_filter = {}
+        for column in df_display.columns:
+            if column in selected_columns:
+                include_in_filter[column] = st.checkbox(f"Include {column} in data filter", True, key=f"{column}_checkbox")
+
+                # Only show the text input if the checkbox is checked
+                if include_in_filter[column] and column != "Distance":
+                    filter_value = st.text_input(f"Filter by {column}:", "")
+                    df_display = df_display[df_display[column].astype(str).str.contains(filter_value, case=False, na=False)]
+
+                # Use a slider for filtering by Distance
+                elif include_in_filter[column] and column == "Distance":
+                    max_distance = float(df_display["Distance"].max())
+                    distance_filter = st.slider("Filter by Distance:", 0.0, max_distance, (0.0, max_distance), key="distance_slider")
+                    df_display = df_display[(df_display["Distance"] >= distance_filter[0]) & (df_display["Distance"] <= distance_filter[1])]
+
+        # Additional text filters for columns not in map_related_columns
+        for column in additional_text_filters:
+            include_in_filter[column] = st.checkbox(f"Include {column} in data filter", False, key=f"{column}_checkbox")
+
+            # Only show the text input if the checkbox is checked
+            if include_in_filter[column]:
+                filter_value = st.text_input(f"Filter by {column}:", "")
+                df_display = df_display[df_display[column].astype(str).str.contains(filter_value, case=False, na=False)]
+
+    # Display the filtered DataFrame
     st.write(df_display)
-
-    # Create a Folium map with markers based on the 'Latitude' and 'Longitude' columns in df_unique
-    map_with_markers = folium.Map(location=[df_unique['Latitude'].mean(), df_unique['Longitude'].mean()], zoom_start=10)
-
-    # Add a Marker Cluster to group markers
-    marker_cluster = MarkerCluster().add_to(map_with_markers)
-
-    for index, row in df_unique.iterrows():
-        # Dynamic popup text for each marker
-        popup_text = f"<div style='white-space: nowrap;'><b>{row['Name']}</b><br>" \
-                     f"Distance: {row['Distance']} miles</div>"
-
-        # Add markers to the map with the dynamic popup
-        folium.Marker(
-            location=[row['Latitude'], row['Longitude']],
-            popup=popup_text,
-            icon=None  # You can customize the icon if needed
-        ).add_to(marker_cluster)
+    
+#----------------------------------------------------------------
+#----------------------------------------------------------------
 
     # Download button for Excel file
     output_file = 'MarketResearch.xlsx'
@@ -254,7 +288,7 @@ if GOOGLE_MAPS_API_KEY:
 
     # Use pd.ExcelWriter as a context manager to write the DataFrame to the buffer
     with pd.ExcelWriter(excel_buffer, engine='xlsxwriter') as writer:
-        df_unique.to_excel(writer, index=False)
+        df_display.to_excel(writer, index=False)
 
     # Get the Excel file data as bytes
     excel_bytes = excel_buffer.getvalue()
@@ -279,7 +313,42 @@ if GOOGLE_MAPS_API_KEY:
     st.empty()
     st.empty()
 
+#----------------------------------------------------------------
+# ---------------------------------------------------------------
+
+   # Create a Folium map with markers based on the 'Latitude' and 'Longitude' columns in df_display
+    map_with_markers = folium.Map(
+        location=[df_display['Latitude'].mean(), df_display['Longitude'].mean()],
+        zoom_start=10,
+        control_scale=True,  # Show scale control
+    )
+
+    # Add a Marker Cluster to group markers
+    marker_cluster = MarkerCluster().add_to(map_with_markers)
+
+    for index, row in df_display.iterrows():
+        # Dynamic popup text for each marker
+        popup_text = f"<div style='white-space: nowrap;'><b>{row['Name']}</b><br>" \
+                    f"Distance: {row['Distance']} miles</div>"
+
+        # Add markers to the map with the dynamic popup
+        folium.Marker(
+            location=[row['Latitude'], row['Longitude']],
+            popup=popup_text,
+            icon=None  # You can customize the icon if needed
+        ).add_to(marker_cluster)
+        
+        
     # Display the Folium map using stfolium
+    st.markdown("""
+        <style>
+        iframe {
+            width: 100%;
+            min-height: 400px;
+            height: 100%:
+        }
+        </style>
+        """, unsafe_allow_html=True)
     st.write("Map with Markers:")
     folium_static(map_with_markers)
 
