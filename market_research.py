@@ -67,9 +67,7 @@ def find_places(api_key, location, distance, place_types):
                     # Check if the distance is within the specified search distance
                     if distance_miles <= distance:
                         # Place Details request to get additional information
-                        details_result = gmaps.place(place_id=place['place_id'],
-                                                     fields=['formatted_phone_number', 'opening_hours', 'website',
-                                                             'user_ratings_total', 'rating'])
+                        #details_result = gmaps.place(place_id=place['place_id'], fields=['formatted_phone_number', 'opening_hours', 'website', 'user_ratings_total', 'rating'])
 
                         # Extract the primary type (first element in the types array)
                         primary_type = place.get('types', [])[0] if place.get('types', []) else ''
@@ -81,11 +79,11 @@ def find_places(api_key, location, distance, place_types):
                             'Address': place.get('formatted_address', ''),
                             'Type': primary_type,
                             'Distance': round(distance_miles, 2),
-                            'Phone': details_result.get('formatted_phone_number', ''),
-                            'Website': details_result.get('website', ''),
-                            'Opening_Hours': details_result.get('opening_hours', {}).get('weekday_text', ''),
-                            'Rating': details_result.get('rating', 'N/A'),
-                            'User_Ratings_Total': details_result.get('user_ratings_total', 'N/A'),
+                            # 'Phone': details_result.get('formatted_phone_number', ''),
+                            # 'Website': details_result.get('website', ''),
+                            # 'Opening_Hours': details_result.get('opening_hours', {}).get('weekday_text', ''),
+                            # 'Rating': details_result.get('rating', 'N/A'),
+                            # 'User_Ratings_Total': details_result.get('user_ratings_total', 'N/A'),
                             'Latitude': place_location[0],
                             'Longitude': place_location[1]
                         }
@@ -123,6 +121,27 @@ def find_places(api_key, location, distance, place_types):
 with open(css_file) as f:
     st.markdown("<style>{}</style>".format(f.read()), unsafe_allow_html=True)
 
+# Check if it's the user's first time
+if 'first_time' not in st.session_state:
+    # Display the welcome message with background color and wrapping
+    welcome_message = """
+    <div style="background-color: #87CEEB; padding: 10px; border-radius: 5px; margin-bottom: 10px;">
+        👋 Welcome! Default Entry: <b><i><span style='color:#B87333;'>Denver, gas</span></i></b>. Enter yours. For issues, check bottom of the app.
+    </div>
+    """
+    st.markdown(welcome_message, unsafe_allow_html=True)
+
+    # Add a button to close the message
+    close_button = st.button("Close")
+
+    # Check if the button is clicked
+    if close_button:
+        # Mark that the user has seen the popup
+        st.session_state.first_time = True
+        # Close the expander immediately
+        st.experimental_rerun()
+
+    
 # Streamlit app Begins
 st.markdown("<h1 style='text-align: center;'>Find Nearby Places</h1>", unsafe_allow_html=True)
 
@@ -194,7 +213,20 @@ if GOOGLE_MAPS_API_KEY:
 
     # Display the results
     st.write(f"Results for {location}")
-    st.write(df_unique)
+    
+    # Filter columns based on user input
+    selected_columns = st.multiselect("Select Columns to Display:", df_unique.columns)
+    
+    # Apply column filtering
+    df_display = df_unique[selected_columns]
+    
+    # Filter data in each column
+    for column in selected_columns:
+        filter_value = st.text_input(f"Filter by {column}:", "")
+        if filter_value:
+            df_display = df_display[df_display[column].astype(str).str.contains(filter_value, case=False, na=False)]
+
+    st.write(df_display)
 
     # Create a Folium map with markers based on the 'Latitude' and 'Longitude' columns in df_unique
     map_with_markers = folium.Map(location=[df_unique['Latitude'].mean(), df_unique['Longitude'].mean()], zoom_start=10)
@@ -260,31 +292,32 @@ with st.expander("Overview"):
 
 # Info section for location
 with st.expander("Usage"):
-    st.write("1. **Tell Me Where:** You start by telling the app where you want to find places – whether it's your current location, a specific address, or your favorite city. It's all about making this experience personalized just for you.")
-    st.write("2. **How Far?:** Using a slider, you get to decide how far you're willing to venture. Want places within a short stroll or a bit farther away? It's up to you! You're in control of your exploration radius.")
-    st.write("3. **What Are You in the Mood For?:** Next, you let the app know what you're in the mood for. Fancy a good meal, a workout, or maybe a peaceful park? Just type it in, separated by commas. The app understands your preferences.")
-    st.write("4. **Results at Your Fingertips:** You instantly see the results – neatly organized in a table. You get details like the name of the place, its type, distance from your specified location, and even ratings from fellow explorers like yourself.")
-    st.write("5. **See it on the Map:** For a visual treat, the app plots your discoveries on a map. It's like a virtual tour guide, showing you exactly where each place is located. Explore with your eyes before you go explore in person.")
-    st.write("6. **Take It With You:** And guess what? You can even take these results with you! Click a button, and the app prepares an Excel file for you to keep. Perfect for planning or sharing your newfound treasures with friends.")
+    st.write("Tell Me Where: Share your location, address, or favorite city for personalized exploration.")
+    st.write("How Far?: Use a slider to control your exploration radius. You decide the distance!")
+    st.write("Mood Filter: Specify preferences, like a meal, workout, or park. App understands you!")
+    st.write("Results Snapshot: Neatly organized table with place name, type, distance, and ratings.")
+    st.write("Visual Map: Discoveries plotted on a map, providing a virtual tour guide experience.")
+    st.write("Take It With You: Download results as an Excel file for planning or sharing.")
     st.write("It's all about putting the adventure in your hands – where to go, what to discover, and how to make the most of your exploration. Happy exploring!")
 
 # Info section for potential errors
 with st.expander("Potential Errors"):
     st.write("Here are some potential errors and how to handle them when using the 'Find Nearby Places' app:")
-    st.write("**1. No Nearby Places Found:** If there are no nearby places found based on your criteria, the app will not throw an error. Instead, it will display a message letting you know that no results were found. You might want to adjust your search parameters or try a different location.")
-    st.write("**2. Typing Error in Place Types:** Be careful when entering place types. If you accidentally leave a comma at the end of the last place type (e.g., 'gym,'), the app may interpret it as an additional empty place type, leading to unexpected results. Double-check your input and remove any trailing commas.")
-    st.write("**3. Invalid Location:** If you provide an invalid or non-existent location, the app will attempt to handle it gracefully. However, to ensure accurate results, it's recommended to enter a valid address, city, or location information.")
-    st.write("**5. Unexpected Network Issues:** In the case of unexpected network issues or disruptions in accessing the Google Maps API, the app will display a warning message. You may want to check your internet connection or try again later.")
-    st.write("By being aware of these potential scenarios, you can enhance your experience with the app and ensure smooth exploration.")
+    st.write("No Nearby Places Found: Adjust search parameters or try a different location for results.")
+    st.write("Typing Error in Place Types: Remove trailing commas to avoid unexpected results in input.")
+    st.write("Invalid Location: Enter a valid address or city for accurate search results.")
+    st.write("Unexpected Network Issues: Check internet connection if app warns of API disruptions.")
+    st.write("Be aware of potential scenarios for a smoother app experience and exploration.")
 
 # Info section for feature updates
-with st.expander("Feature Updates"):
+with st.expander("Future Updates"):
     st.write("Exciting updates are in the pipeline for the 'Find Nearby Places' app. Here's what you can look forward to in future releases:")
-    st.write("**1. Automatic Location Detection:** Soon, the app will prompt you to share your current location. This will automatically set the search area, making it even easier for you to find nearby places without manually entering your location.")
-    st.write("**2. Enhanced Place Details:** Get more information about the places you discover. The upcoming update will include phone numbers, website links, and whether a place is currently open or closed. It's all about providing you with the details you need at your fingertips.")
-    st.write("**3. Open Now Filter:** Customize your search by only displaying places that are open now. This feature will help you find the perfect spot that fits your current schedule or preferences.")
-    st.write("**4. Improved Input Handling:** Say goodbye to unnecessary spaces and commas! The app will intelligently handle input, removing extra spaces in place names and trimming any trailing commas in your specified place types.")
-    st.write("**5. User Accounts:** Soon, you'll have the option to create a user account. By logging in, you can save your favorite searches, making it convenient to revisit and plan future explorations. Your personalized experience is just a login away!")
+    st.write("Auto Detect Location: App soon prompts for your location, streamlining nearby place searches effortlessly.")
+    st.write("Place Details Upgrade: Upcoming update includes phone numbers, websites, and current open/closed status for discovery ease.")
+    st.write("Open Now Filter: Tailor your search to show places open now for on-the-spot convenience.")
+    st.write("Improved Input: App intelligently handles input, eliminating extra spaces and commas for smoother interaction.")
+    st.write("User Accounts Coming: Create an account to save searches for personalized future explorations. Login soon!")
+    st.write("**6. Enhanced filter: ** Ability to select items from the list below for quick and easy filtering options.")
     st.write("We're committed to continuously enhancing your experience with the app. Stay tuned for these exciting updates, and happy exploring!")
 
 #----------------------------------------------------------------
