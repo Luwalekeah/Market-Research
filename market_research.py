@@ -1,8 +1,10 @@
 import os
 import io
+import sys
 import time
 import base64
 import folium
+import platform
 import webbrowser
 import googlemaps
 import pandas as pd
@@ -325,6 +327,9 @@ if GOOGLE_MAPS_API_KEY:
 
 #----------------------------------------------------------------
 # --------------------------------------------------------------- 
+    # Number of items to display initially
+    num_items_to_display = 5
+
     # Function to generate Google Maps link for multiple locations
     def generate_google_maps_link(addresses):
         addresses_str = '|'.join([address.replace(' ', '+') for address in addresses])
@@ -341,24 +346,48 @@ if GOOGLE_MAPS_API_KEY:
         link = generate_google_maps_link([address])
         webbrowser.open(link, new=2)
 
-    st.write("\n")
+    # Determine the platform
+    platform_name = sys.platform.lower()  # Convert to lowercase for consistency
+
+    # Display the platform information
+    if "darwin" in platform_name:
+        st.write("Running on macOS")
+    elif "win" in platform_name:
+        st.write("Running on Windows")
+    elif "linux" in platform_name:
+        st.write("Running on Linux")
+    else:
+        st.write("Unknown platform")
 
     # Add an expander with buttons for each place
     with st.expander("Open Places in Google Maps"):
-            # Add a button to open all locations in Google Maps
+        # Add a button to open all locations in Google Maps
         if st.button("Open All in Google Maps"):
             open_in_google_maps()
-        for index, row in df_display.iterrows():
+        for index, row in df_display.head(num_items_to_display).iterrows():
             button_label = f"{row['Name']} - {row.get('Distance', 'N/A')}"
             if st.button(button_label):
                 open_single_location_in_google_maps(row['Address'])
-    st.write("\n")
 
-   # Create a Folium map with markers based on the 'Latitude' and 'Longitude' columns in df_display
+        # Check if there are more items to display
+        if len(df_display) > num_items_to_display:
+            # Use CSS styling for scrollbar and max-height
+            st.markdown(
+                "<style>div[data-testid='stExpander'] > div {overflow-y: auto; max-height: 300px;}</style>",
+                unsafe_allow_html=True
+            )
+
+            # Display buttons for the remaining items
+            for index, row in df_display.iloc[num_items_to_display:].iterrows():
+                button_label = f"{row['Name']} - {row.get('Distance', 'N/A')}"
+                if st.button(button_label):
+                    open_single_location_in_google_maps(row['Address'])
+
+    # Create a Folium map with markers based on the 'Latitude' and 'Longitude' columns in df_display
     map_with_markers = folium.Map(
         location=[df_display['Latitude'].mean(), df_display['Longitude'].mean()],
         zoom_start=10,
-        control_scale=True,  # Show scale control
+        control_scale=True  # Show scale control
     )
 
     # Add a Marker Cluster to group markers
@@ -375,15 +404,14 @@ if GOOGLE_MAPS_API_KEY:
             popup=popup_text,
             icon=None  # You can customize the icon if needed
         ).add_to(marker_cluster)
-        
-        
+
     # Display the Folium map using stfolium
     st.markdown("""
         <style>
         iframe {
             width: 100%;
             min-height: 400px;
-            height: 100%:
+            height: 100%;
         }
         </style>
         """, unsafe_allow_html=True)
