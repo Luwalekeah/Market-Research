@@ -158,6 +158,26 @@ st.markdown("<h1 style='text-align: center;'>Find Nearby Places</h1>", unsafe_al
 # adding some spacing
 st.write("\n")
 
+#----------------------------------------------------------------
+# ---------------------------------------------------------------
+
+# Info section for the purpose of the app
+with st.expander("Overview"):
+    st.write("You're about to embark on a journey of exploration with the 'Find Nearby Places' app. Imagine having the power to discover hidden gems around you. You simply tell the app where you are or want to explore, set the distance you're willing to travel, and pick the types of places you're interested in. The app then uses its magic to fetch all the relevant information for you.")
+
+# Info section for location
+with st.expander("Usage"):
+    st.write("Tell Me Where: Share your location, address, or favorite city for personalized exploration.")
+    st.write("How Far?: Use a slider to control your exploration radius. You decide the distance!")
+    st.write("Mood Filter: Specify preferences, like a meal, workout, or park. App understands you!")
+    st.write("Results Snapshot: Neatly organized table with place name, type, distance, and ratings.")
+    st.write("Visual Map: Discoveries plotted on a map, providing a virtual tour guide experience.")
+    st.write("Take It With You: Download results as an Excel file for planning or sharing.")
+    st.write("It's all about putting the adventure in your hands – where to go, what to discover, and how to make the most of your exploration. Happy exploring!")
+
+#----------------------------------------------------------------
+# ---------------------------------------------------------------
+
 # Banner below the title
 # st.markdown("<div style='text-align: center; background-color: white; padding: 10px; border: 2px solid #B87333; border-radius: 5px; font-weight: bold; color: black;'>Error(s) resolves with input of address and place type.</div>", unsafe_allow_html=True)
 
@@ -327,9 +347,6 @@ if GOOGLE_MAPS_API_KEY:
 
 #----------------------------------------------------------------
 # --------------------------------------------------------------- 
-    # Number of items to display initially
-    num_items_to_display = 5
-
     # Function to generate Google Maps link for multiple locations
     def generate_google_maps_link(addresses):
         addresses_str = '|'.join([address.replace(' ', '+') for address in addresses])
@@ -346,56 +363,40 @@ if GOOGLE_MAPS_API_KEY:
         link = generate_google_maps_link([address])
         webbrowser.open(link, new=2)
 
-    # Determine the platform
-    platform_name = sys.platform.lower()  # Convert to lowercase for consistency
-
-    # Display the platform information
-    if "darwin" in platform_name:
-        st.write("Running on macOS")
-    elif "win" in platform_name:
-        st.write("Running on Windows")
-    elif "linux" in platform_name:
-        st.write("Running on Linux")
-    else:
-        st.write("Unknown platform")
+    st.write("\n")
 
     # Add an expander with buttons for each place
     with st.expander("Open Places in Google Maps"):
-        # Add a button to open all locations in Google Maps
+            # Add a button to open all locations in Google Maps
         if st.button("Open All in Google Maps"):
             open_in_google_maps()
-        for index, row in df_display.head(num_items_to_display).iterrows():
+        for index, row in df_display.iterrows():
             button_label = f"{row['Name']} - {row.get('Distance', 'N/A')}"
             if st.button(button_label):
                 open_single_location_in_google_maps(row['Address'])
+    st.write("\n")
 
-        # Check if there are more items to display
-        if len(df_display) > num_items_to_display:
-            # Use CSS styling for scrollbar and max-height
-            st.markdown(
-                "<style>div[data-testid='stExpander'] > div {overflow-y: auto; max-height: 300px;}</style>",
-                unsafe_allow_html=True
-            )
-
-            # Display buttons for the remaining items
-            for index, row in df_display.iloc[num_items_to_display:].iterrows():
-                button_label = f"{row['Name']} - {row.get('Distance', 'N/A')}"
-                if st.button(button_label):
-                    open_single_location_in_google_maps(row['Address'])
-
-    # Create a Folium map with markers based on the 'Latitude' and 'Longitude' columns in df_display
+   # Create a Folium map with markers based on the 'Latitude' and 'Longitude' columns in df_display
     map_with_markers = folium.Map(
         location=[df_display['Latitude'].mean(), df_display['Longitude'].mean()],
         zoom_start=10,
-        control_scale=True  # Show scale control
+        control_scale=True,  # Show scale control
     )
 
     # Add a Marker Cluster to group markers
     marker_cluster = MarkerCluster().add_to(map_with_markers)
 
+    # Loop through each row in df_display and add markers to the map
     for index, row in df_display.iterrows():
-        # Dynamic popup text for each marker
-        popup_text = f"<div style='white-space: nowrap;'><b>{row['Name']}</b><br>" \
+        # Extract the first part of the address
+        first_part_of_address = row['Address'].split(',')[0]
+
+        # Extract the city from the address
+        address_parts = row['Address'].split(',')
+        city = address_parts[-3].strip()  # Assuming city is the third-to-last part
+
+        # Dynamic popup text for each marker including the first part of the address and city
+        popup_text = f"<div style='white-space: nowrap;'><b>{row['Name']} - {first_part_of_address}, {city}</b><br>" \
                     f"Distance: {row['Distance']} miles</div>"
 
         # Add markers to the map with the dynamic popup
@@ -404,14 +405,15 @@ if GOOGLE_MAPS_API_KEY:
             popup=popup_text,
             icon=None  # You can customize the icon if needed
         ).add_to(marker_cluster)
-
+        
+        
     # Display the Folium map using stfolium
     st.markdown("""
         <style>
         iframe {
             width: 100%;
             min-height: 400px;
-            height: 100%;
+            height: 100%:
         }
         </style>
         """, unsafe_allow_html=True)
@@ -420,20 +422,6 @@ if GOOGLE_MAPS_API_KEY:
 
 #----------------------------------------------------------------
 # ---------------------------------------------------------------
-
-# Info section for the purpose of the app
-with st.expander("Overview"):
-    st.write("You're about to embark on a journey of exploration with the 'Find Nearby Places' app. Imagine having the power to discover hidden gems around you. You simply tell the app where you are or want to explore, set the distance you're willing to travel, and pick the types of places you're interested in. The app then uses its magic to fetch all the relevant information for you.")
-
-# Info section for location
-with st.expander("Usage"):
-    st.write("Tell Me Where: Share your location, address, or favorite city for personalized exploration.")
-    st.write("How Far?: Use a slider to control your exploration radius. You decide the distance!")
-    st.write("Mood Filter: Specify preferences, like a meal, workout, or park. App understands you!")
-    st.write("Results Snapshot: Neatly organized table with place name, type, distance, and ratings.")
-    st.write("Visual Map: Discoveries plotted on a map, providing a virtual tour guide experience.")
-    st.write("Take It With You: Download results as an Excel file for planning or sharing.")
-    st.write("It's all about putting the adventure in your hands – where to go, what to discover, and how to make the most of your exploration. Happy exploring!")
 
 # Info section for potential errors
 with st.expander("Potential Errors"):
