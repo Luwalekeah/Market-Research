@@ -367,14 +367,20 @@ if GOOGLE_MAPS_API_KEY:
 
     # Add an expander with buttons for each place
     with st.expander("Open Places in Google Maps"):
-            # Add a button to open all locations in Google Maps
+        # Display a warning message
+        st.warning("One a button is clicked, wait 15 seconds for the page to open in the web browser.")
+        
+        # Add a button to open all locations in Google Maps
         if st.button("Open All in Google Maps"):
             open_in_google_maps()
+
         for index, row in df_display.iterrows():
             button_label = f"{row['Name']} - {row.get('Distance', 'N/A')}"
             if st.button(button_label):
                 open_single_location_in_google_maps(row['Address'])
+
     st.write("\n")
+
 
    # Create a Folium map with markers based on the 'Latitude' and 'Longitude' columns in df_display
     map_with_markers = folium.Map(
