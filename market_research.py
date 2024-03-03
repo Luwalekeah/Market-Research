@@ -368,7 +368,7 @@ if GOOGLE_MAPS_API_KEY:
     # Add an expander with buttons for each place
     with st.expander("Open Places in Google Maps"):
         # Display a warning message
-        st.warning("One a button is clicked, wait 15 seconds for the page to open in the web browser.")
+        st.warning("Once a button is clicked, wait 15 seconds for the page to open in the web browser.")
         
         # Add a button to open all locations in Google Maps
         if st.button("Open All in Google Maps"):
