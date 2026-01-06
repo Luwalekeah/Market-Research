@@ -1,13 +1,16 @@
 @import url('https://fonts.googleapis.com/css2?family=Readex+Pro:wght@300;400;500;600;700&display=swap');
 
+/* Base styles */
+* {
+    font-family: 'Readex Pro', sans-serif;
+}
 
-* {font-family: 'Readex Pro';}
-
-
+/* Link styles */
 a {
     text-decoration: none;
     color: white !important;
     font-weight: 500;
+    transition: color 0.2s ease;
 }
 
 a:hover {
@@ -15,17 +18,119 @@ a:hover {
     text-decoration: none;
 }
 
-ul {list-style-type: none;}
+/* List styles */
+ul {
+    list-style-type: none;
+}
 
+/* Horizontal rule */
 hr {
     margin-top: 0px;
     margin-bottom: 5%;
 }
 
-#MainMenu {visibility: hidden;}
-footer {visibility: hidden;}
-header {visibility: hidden;}
+/* Hide Streamlit elements */
+#MainMenu {
+    visibility: hidden;
+}
 
+footer {
+    visibility: hidden;
+}
+
+header {
+    visibility: hidden;
+}
+
+/* Custom expander styling */
 .custom-expander {
     margin-bottom: 0px !important;
+}
+
+/* Metric cards */
+.metric-card {
+    background-color: #f0f2f6;
+    padding: 15px;
+    border-radius: 10px;
+    text-align: center;
+    margin: 5px;
+}
+
+/* Data table improvements */
+.stDataFrame {
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+/* Button styling */
+.stButton > button {
+    border-radius: 8px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.stButton > button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Input field styling */
+.stTextInput > div > div > input {
+    border-radius: 8px;
+}
+
+/* Slider styling */
+.stSlider > div > div > div > div {
+    background-color: #B87333;
+}
+
+/* Alert styling */
+.stAlert {
+    border-radius: 10px;
+}
+
+/* Download button */
+.stDownloadButton > button {
+    background-color: #B87333;
+    color: white;
+    border: none;
+}
+
+.stDownloadButton > button:hover {
+    background-color: #9A6028;
+}
+
+/* Tab styling */
+.stTabs [data-baseweb="tab-list"] {
+    gap: 8px;
+}
+
+.stTabs [data-baseweb="tab"] {
+    border-radius: 8px 8px 0 0;
+    padding: 10px 20px;
+}
+
+/* Map container */
+.folium-map {
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Sidebar styling */
+.css-1d391kg {
+    padding: 2rem 1rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .metric-card {
+        padding: 10px;
+        margin: 3px;
+    }
+    
+    .stButton > button {
+        font-size: 14px;
+        padding: 8px 16px;
+    }
 }
