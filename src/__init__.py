@@ -4,6 +4,7 @@ Market Research App - Find nearby places and extract business contact informatio
 This package provides tools for:
 - Searching for places using the Google Maps API
 - Extracting email addresses from business websites
+- Matching businesses against Colorado Secretary of State database
 - Exporting data to Excel/CSV
 - Visualizing results on interactive maps
 """
@@ -29,6 +30,13 @@ from .email_extractor import (
     extract_single_email,
 )
 
+from .colorado_sos import (
+    enrich_with_agent_names,
+    load_colorado_data,
+    get_colorado_data_status,
+    download_colorado_data,
+)
+
 from .data_utils import (
     places_to_dataframe,
     clean_dataframe,
@@ -43,7 +51,7 @@ from .mapping import (
     generate_single_maps_link,
 )
 
-__version__ = '1.0.0'
+__version__ = '1.1.0'
 __author__ = 'Luwalekeah'
 
 __all__ = [
@@ -62,6 +70,11 @@ __all__ = [
     'extract_email_from_website',
     'enrich_places_with_emails',
     'extract_single_email',
+    # Colorado SOS
+    'enrich_with_agent_names',
+    'load_colorado_data',
+    'get_colorado_data_status',
+    'download_colorado_data',
     # Data
     'places_to_dataframe',
     'clean_dataframe',

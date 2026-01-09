@@ -5,7 +5,7 @@ A market research tool for discovering nearby businesses and extracting
 their contact information including phone numbers, websites, and emails.
 """
 import streamlit as st
-from streamlit_folium import folium_static
+from streamlit_folium import st_folium
 
 from src import (
     GOOGLE_MAPS_API_KEY,
@@ -14,6 +14,8 @@ from src import (
     DEFAULT_DISTANCE_MILES,
     search_places,
     enrich_places_with_emails,
+    enrich_with_agent_names,
+    get_colorado_data_status,
     places_to_dataframe,
     clean_dataframe,
     export_to_excel,
@@ -118,6 +120,26 @@ def main():
             value=False,
             help="Attempt to extract email addresses from business websites. This may take extra time."
         )
+        
+        # Colorado SOS matching
+        st.divider()
+        st.subheader("🏛️ Colorado SOS Lookup")
+        match_colorado_sos = st.checkbox(
+            "Find registered agents",
+            value=False,
+            help="Match businesses against Colorado Secretary of State database to find registered agent names."
+        )
+        
+        if match_colorado_sos:
+            # Show Colorado data status
+            co_status = get_colorado_data_status()
+            if co_status['cached']:
+                st.caption(
+                    f"📁 Data cached ({co_status['size_mb']} MB)\n\n"
+                    f"Updated: {co_status['last_updated']}"
+                )
+            else:
+                st.caption("⚠️ Data will be downloaded on first use (~200MB)")
     
     # Check API key
     if not GOOGLE_MAPS_API_KEY:
@@ -214,6 +236,30 @@ def main():
             df = places_to_dataframe(places)
             df = clean_dataframe(df, max_distance=distance)
             
+            # Match against Colorado SOS database if enabled
+            if match_colorado_sos:
+                with st.spinner("Matching against Colorado Secretary of State database..."):
+                    sos_progress = st.progress(0)
+                    sos_status = st.empty()
+                    
+                    def sos_progress_callback(completed, total):
+                        sos_progress.progress(completed / total)
+                        sos_status.caption(f"Processing {completed}/{total} businesses...")
+                    
+                    df = enrich_with_agent_names(
+                        df,
+                        progress_callback=sos_progress_callback
+                    )
+                    
+                    sos_progress.empty()
+                    sos_status.empty()
+                    
+                    # Show match summary
+                    if 'BusinessName' in df.columns:
+                        matched = (df['BusinessName'].notna() & (df['BusinessName'] != '')).sum()
+                        agent_matched = (df['AgentName'].notna() & (df['AgentName'] != '')).sum()
+                        st.success(f"🏛️ Matched {matched} businesses to Colorado SOS records ({agent_matched} with agent names)")
+            
             # Store in session state
             st.session_state.results_df = df
             st.session_state.search_location = location
@@ -228,12 +274,21 @@ def main():
         # Summary metrics
         stats = get_summary_stats(df)
         
-        col1, col2, col3, col4, col5 = st.columns(5)
+        # Calculate agent and business name match counts
+        agent_count = 0
+        business_name_count = 0
+        if 'AgentName' in df.columns:
+            agent_count = (df['AgentName'].notna() & (df['AgentName'] != '')).sum()
+        if 'BusinessName' in df.columns:
+            business_name_count = (df['BusinessName'].notna() & (df['BusinessName'] != '')).sum()
+        
+        col1, col2, col3, col4, col5, col6 = st.columns(6)
         col1.metric("Total Places", stats['total_places'])
         col2.metric("With Phone", stats['with_phone'])
         col3.metric("With Website", stats['with_website'])
         col4.metric("With Email", stats['with_email'])
-        col5.metric("Avg Distance", f"{stats.get('avg_distance', 0)} mi")
+        col5.metric("SOS Matched", business_name_count)
+        col6.metric("Avg Distance", f"{stats.get('avg_distance', 0)} mi")
         
         st.divider()
         
@@ -306,13 +361,7 @@ def main():
             if not df.empty and 'Latitude' in df.columns:
                 places_map = create_places_map(df)
                 
-                st.markdown("""
-                <style>
-                iframe { width: 100%; min-height: 500px; }
-                </style>
-                """, unsafe_allow_html=True)
-                
-                folium_static(places_map, width=None, height=500)
+                st_folium(places_map, width=None, height=500, returned_objects=[])
                 
                 # Google Maps links
                 with st.expander("🔗 Open in Google Maps"):
@@ -383,11 +432,32 @@ def main():
         this app visits business websites to search for email addresses on
         their main page and contact pages.
         
+        ### About Colorado SOS Lookup
+        
+        This feature matches businesses against the Colorado Secretary of State's
+        public business entities database to find registered agent names.
+        
+        **How it works:**
+        1. First attempts to match by business name (fuzzy matching, 80%+ threshold)
+        2. If no name match, falls back to matching by street address
+        3. Only matches Colorado businesses (filters by city for accuracy)
+        
+        **Output columns when enabled:**
+        - `BusinessName`: Official registered name from Colorado SOS
+        - `AgentName`: Registered agent's name (person names only)
+        - `MatchConfidence`: Fuzzy match score (0-100)
+        - `MatchType`: How the match was made (`name` or `address`)
+        
+        **Note:** The Colorado data (~600MB) is downloaded on first use and cached
+        locally for 7 days. Agent names are only included when a person's first name
+        is available (organization names are excluded).
+        
         ### Tips
         
         - Enable "Fetch detailed info" for complete contact information
         - Email extraction can be slow for large result sets
         - Use specific place types for better results
+        - Colorado SOS lookup works best for Colorado-based searches
         
         ### Common Place Types
         

@@ -5,6 +5,7 @@ Find Nearby Places - Command Line Interface
 Usage:
     python cli.py --location "Denver, CO" --distance 10 --types "restaurant,gym"
     python cli.py -l "New York" -d 5 -t "pharmacy" --emails --output results.xlsx
+    python cli.py -l "Aurora, CO" -d 5 -t "gas" --agents -v
 """
 import argparse
 import sys
@@ -14,6 +15,7 @@ from src import (
     GOOGLE_MAPS_API_KEY,
     search_places,
     enrich_places_with_emails,
+    enrich_with_agent_names,
     places_to_dataframe,
     clean_dataframe,
     export_to_excel,
@@ -32,6 +34,7 @@ Examples:
   %(prog)s -l "Denver, CO" -d 10 -t "restaurant"
   %(prog)s -l "NYC" -d 5 -t "gym,pharmacy" --emails -o leads.xlsx
   %(prog)s --location "90210" --distance 15 --types "hotel,restaurant" --csv
+  %(prog)s -l "Aurora, CO" -d 5 -t "gas" --agents -v
         """
     )
     
@@ -58,6 +61,12 @@ Examples:
         '--emails',
         action='store_true',
         help='Extract email addresses from business websites'
+    )
+    
+    parser.add_argument(
+        '--agents',
+        action='store_true',
+        help='Match against Colorado SOS database to find registered agent names'
     )
     
     parser.add_argument(
@@ -154,14 +163,41 @@ def main():
     df = places_to_dataframe(places)
     df = clean_dataframe(df, max_distance=args.distance)
     
+    # Match against Colorado SOS if requested
+    if args.agents:
+        print("\n🏛️ Matching against Colorado Secretary of State database...")
+        
+        def agent_progress(completed, total):
+            if args.verbose:
+                print(f"   Progress: {completed}/{total}", end='\r')
+        
+        df = enrich_with_agent_names(
+            df,
+            progress_callback=agent_progress if args.verbose else None
+        )
+        
+        if args.verbose:
+            print()
+    
     # Get statistics
     stats = get_summary_stats(df)
+    
+    # Calculate match counts
+    agent_count = 0
+    business_name_count = 0
+    if 'AgentName' in df.columns:
+        agent_count = (df['AgentName'].notna() & (df['AgentName'] != '')).sum()
+    if 'BusinessName' in df.columns:
+        business_name_count = (df['BusinessName'].notna() & (df['BusinessName'] != '')).sum()
     
     print(f"\n📊 Summary:")
     print(f"   Total places: {stats['total_places']}")
     print(f"   With phone: {stats['with_phone']}")
     print(f"   With website: {stats['with_website']}")
     print(f"   With email: {stats['with_email']}")
+    if args.agents:
+        print(f"   SOS matched: {business_name_count}")
+        print(f"   With agent name: {agent_count}")
     print(f"   Average distance: {stats.get('avg_distance', 'N/A')} miles")
     
     # Determine output path
@@ -180,8 +216,15 @@ def main():
     
     # Show sample if verbose
     if args.verbose and len(df) > 0:
+        sample_cols = ['Name', 'Distance', 'Phone']
+        if 'Email' in df.columns:
+            sample_cols.append('Email')
+        if 'BusinessName' in df.columns:
+            sample_cols.append('BusinessName')
+        if 'AgentName' in df.columns:
+            sample_cols.append('AgentName')
         print("\n📝 Sample results:")
-        print(df[['Name', 'Distance', 'Phone', 'Email']].head().to_string(index=False))
+        print(df[sample_cols].head().to_string(index=False))
     
     print("\n✨ Done!")
 
