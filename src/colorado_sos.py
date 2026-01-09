@@ -122,22 +122,41 @@ def load_colorado_data() -> Optional[pd.DataFrame]:
     try:
         logger.info("Loading Colorado business entities data...")
         
-        # Only load columns we need to save memory
-        usecols = [
+        # First, read just the header to see what columns exist
+        df_header = pd.read_csv(cache_path, nrows=0)
+        available_cols = [c.lower() for c in df_header.columns]
+        logger.info(f"Available columns: {available_cols[:10]}...")  # Log first 10
+        
+        # Define columns we want (will only load ones that exist)
+        desired_cols = [
             'entityname',
             'principaladdress1',
             'principalcity',
             'principalstate',
+            'principalzipcode',
             'agentfirstname',
             'agentmiddlename',
             'agentlastname',
             'agentorganizationname',
-            'entityformationdate'  # To prioritize most recent businesses
+            # Try different possible names for formation date
+            'entityformdate',  # This is the actual column name!
+            'entityformationdate',
+            'formationdate', 
+            'formation_date',
+            'dateformed',
+            # Try different possible names for status
+            'entitystatus',
+            'status',
+            'entitystatusname'
         ]
+        
+        # Filter to only columns that actually exist
+        cols_to_load = [c for c in desired_cols if c.lower() in available_cols]
+        logger.info(f"Loading columns: {cols_to_load}")
         
         df = pd.read_csv(
             cache_path,
-            usecols=lambda c: c.lower() in [col.lower() for col in usecols],
+            usecols=lambda c: c.lower() in [col.lower() for col in cols_to_load],
             dtype=str,
             low_memory=False
         )
@@ -146,27 +165,83 @@ def load_colorado_data() -> Optional[pd.DataFrame]:
         df.columns = df.columns.str.lower()
         
         # Filter to Colorado businesses only
-        df = df[df['principalstate'].str.upper() == 'CO']
+        if 'principalstate' in df.columns:
+            df = df[df['principalstate'].fillna('').str.upper() == 'CO']
         
-        # Parse formation date and sort by most recent first
-        # This ensures when we find multiple matches, we get the most recent one
-        df['formation_date_parsed'] = pd.to_datetime(
-            df['entityformationdate'], 
-            errors='coerce'
+        # Handle entity status - try different column names
+        status_col = None
+        for col_name in ['entitystatus', 'status', 'entitystatusname']:
+            if col_name in df.columns:
+                status_col = col_name
+                break
+        
+        if status_col:
+            df['entitystatus_clean'] = df[status_col].fillna('').str.upper().str.strip()
+            
+            # Create status priority (lower = better)
+            def status_priority(status):
+                status_upper = str(status).upper()
+                if 'GOOD STANDING' in status_upper:
+                    return 1
+                elif 'EXISTS' in status_upper:
+                    return 2
+                elif 'DELINQUENT' in status_upper:
+                    return 3
+                elif 'DISSOLVED' in status_upper or 'WITHDRAWN' in status_upper or 'REVOKED' in status_upper:
+                    return 99
+                else:
+                    return 50
+            
+            df['status_priority'] = df['entitystatus_clean'].apply(status_priority)
+            
+            # Filter out dissolved/withdrawn businesses
+            df = df[df['status_priority'] < 99]
+        else:
+            logger.warning("No status column found - cannot filter by entity status")
+            df['status_priority'] = 50  # Default priority
+        
+        # Handle formation date - try different column names
+        date_col = None
+        for col_name in ['entityformdate', 'entityformationdate', 'formationdate', 'formation_date', 'dateformed']:
+            if col_name in df.columns:
+                date_col = col_name
+                break
+        
+        if date_col:
+            df['formation_date_parsed'] = pd.to_datetime(df[date_col], errors='coerce')
+        else:
+            logger.warning("No formation date column found - cannot sort by date")
+            df['formation_date_parsed'] = pd.NaT
+        
+        # Sort by: status priority (ascending), then formation date (descending/most recent)
+        df = df.sort_values(
+            ['status_priority', 'formation_date_parsed'], 
+            ascending=[True, False], 
+            na_position='last'
         )
-        df = df.sort_values('formation_date_parsed', ascending=False, na_position='last')
         
         # Clean up business names for matching
         df['entityname_clean'] = df['entityname'].fillna('').str.upper().str.strip()
         
         # Clean up city names
-        df['principalcity_clean'] = df['principalcity'].fillna('').str.upper().str.strip()
+        if 'principalcity' in df.columns:
+            df['principalcity_clean'] = df['principalcity'].fillna('').str.upper().str.strip()
+        else:
+            df['principalcity_clean'] = ''
+        
+        # Clean up zip codes
+        if 'principalzipcode' in df.columns:
+            df['principalzipcode_clean'] = df['principalzipcode'].fillna('').str.strip().str[:5]
+        else:
+            df['principalzipcode_clean'] = ''
         
         logger.info(f"Loaded {len(df):,} Colorado business records")
         return df
         
     except Exception as e:
         logger.error(f"Failed to load Colorado data: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
         return None
 
 
@@ -273,6 +348,17 @@ def normalize_street_address(address: str) -> str:
     return addr
 
 
+def _clean_name_field(value) -> str:
+    """Clean a name field, handling nan/None/empty values."""
+    if value is None or pd.isna(value):
+        return ""
+    s = str(value).strip()
+    # Check for various nan representations
+    if s.lower() in ('nan', 'none', 'null', ''):
+        return ""
+    return s
+
+
 def build_agent_name(row: pd.Series) -> str:
     """
     Build agent name from first, middle, and last name fields.
@@ -290,9 +376,23 @@ def build_agent_name(row: pd.Series) -> str:
     Returns:
         Formatted agent name or empty string
     """
-    first = str(row.get('agentfirstname', '') or '').strip()
-    middle = str(row.get('agentmiddlename', '') or '').strip()
-    last = str(row.get('agentlastname', '') or '').strip()
+    first = _clean_name_field(row.get('agentfirstname', ''))
+    middle = _clean_name_field(row.get('agentmiddlename', ''))
+    last = _clean_name_field(row.get('agentlastname', ''))
+    
+    # If both first and last name exist
+    if first and last:
+        if middle:
+            return f"{first} {middle} {last}"
+        return f"{first} {last}"
+    
+    # If only first name exists (no last name), just use first name
+    if first and not last:
+        return first
+    
+    # If only last name exists (no first name), leave blank (don't know gender)
+    # If neither exists, also leave blank
+    return ""
     
     # If both first and last name exist
     if first and last:
@@ -336,6 +436,9 @@ def find_best_match_by_name(
 ) -> Tuple[Optional[pd.Series], int]:
     """
     Find the best matching Colorado business entity by business name.
+    When multiple businesses have similar names, prioritizes by:
+    1. Entity status (Good Standing > Delinquent)
+    2. Formation date (most recent)
     
     Args:
         business_name: Name of the business to match
@@ -356,16 +459,28 @@ def find_best_match_by_name(
     if city_clean:
         city_matches = colorado_df[colorado_df['principalcity_clean'] == city_clean]
         if not city_matches.empty:
-            # Search within city first
-            result = process.extractOne(
+            # Get multiple matches, not just one
+            results = process.extract(
                 business_name_clean,
                 city_matches['entityname_clean'].tolist(),
-                scorer=fuzz.token_sort_ratio
+                scorer=fuzz.token_sort_ratio,
+                limit=10
             )
             
-            if result and result[1] >= threshold:
-                match_idx = city_matches[city_matches['entityname_clean'] == result[0]].index[0]
-                return colorado_df.loc[match_idx], result[1]
+            # Filter to matches above threshold
+            good_matches = [(name, score, idx) for name, score, idx in results if score >= threshold]
+            
+            if good_matches:
+                best_score = good_matches[0][1]
+                # Get all matches with the best score (or within 5 points)
+                best_names = [m[0] for m in good_matches if m[1] >= best_score - 5]
+                matching_rows = city_matches[city_matches['entityname_clean'].isin(best_names)]
+                
+                if not matching_rows.empty:
+                    # DataFrame is already sorted by status_priority, formation_date
+                    # So just take the first one
+                    best_match_idx = matching_rows.index[0]
+                    return colorado_df.loc[best_match_idx], best_score
     
     # If no city match or no good match in city, search all Colorado businesses
     # Use prefix matching for performance (1M+ records is too slow for full search)
@@ -374,15 +489,23 @@ def find_best_match_by_name(
         prefix_matches = colorado_df[colorado_df['entityname_clean'].str.startswith(prefix)]
         
         if not prefix_matches.empty:
-            result = process.extractOne(
+            results = process.extract(
                 business_name_clean,
                 prefix_matches['entityname_clean'].tolist(),
-                scorer=fuzz.token_sort_ratio
+                scorer=fuzz.token_sort_ratio,
+                limit=10
             )
             
-            if result and result[1] >= threshold:
-                match_idx = prefix_matches[prefix_matches['entityname_clean'] == result[0]].index[0]
-                return colorado_df.loc[match_idx], result[1]
+            good_matches = [(name, score, idx) for name, score, idx in results if score >= threshold]
+            
+            if good_matches:
+                best_score = good_matches[0][1]
+                best_names = [m[0] for m in good_matches if m[1] >= best_score - 5]
+                matching_rows = prefix_matches[prefix_matches['entityname_clean'].isin(best_names)]
+                
+                if not matching_rows.empty:
+                    best_match_idx = matching_rows.index[0]
+                    return colorado_df.loc[best_match_idx], best_score
     
     return None, 0
 
@@ -391,17 +514,22 @@ def find_best_match_by_address(
     street_address: str,
     city: str,
     colorado_df: pd.DataFrame,
+    business_name: str = "",
     threshold: int = FUZZY_MATCH_THRESHOLD_ADDRESS
 ) -> Tuple[Optional[pd.Series], int]:
     """
     Find the best matching Colorado business entity by street address.
     Uses normalized addresses to handle variations like "#10" vs "Unit 10".
-    When multiple businesses match the same address, returns the most recently formed one.
+    When multiple businesses match the same address, prioritizes by:
+    1. Entity status (Good Standing > Delinquent)
+    2. Name similarity to the Google Places business name
+    3. Formation date (most recent)
     
     Args:
         street_address: Street address to match (e.g., "123 Main St #10")
         city: City name to filter matches
         colorado_df: DataFrame with Colorado business data
+        business_name: Original business name for similarity comparison
         threshold: Minimum fuzzy match score (0-100)
     
     Returns:
@@ -413,6 +541,7 @@ def find_best_match_by_address(
     # Normalize the input street address
     street_normalized = normalize_street_address(street_address)
     city_clean = city.upper().strip() if city else ""
+    business_name_clean = business_name.upper().strip() if business_name else ""
     
     if not street_normalized:
         return None, 0
@@ -429,35 +558,42 @@ def find_best_match_by_address(
             address_matches = city_matches[city_matches['address_normalized'] != '']
             
             if not address_matches.empty:
-                # Get all matches above threshold, not just the best one
+                # Get all matches above threshold
                 results = process.extract(
                     street_normalized,
                     address_matches['address_normalized'].tolist(),
                     scorer=fuzz.token_sort_ratio,
-                    limit=10  # Get top 10 matches
+                    limit=20  # Get more matches to filter
                 )
                 
                 # Filter to matches above threshold
                 good_matches = [(addr, score, idx) for addr, score, idx in results if score >= threshold]
                 
                 if good_matches:
-                    # Get the best score
+                    # Get the best address match score
                     best_score = good_matches[0][1]
                     
-                    # Find all matches with the best score
-                    best_matches = [m for m in good_matches if m[1] == best_score]
+                    # Find all matches with the best score (or close to it)
+                    best_addresses = [m[0] for m in good_matches if m[1] >= best_score - 5]
+                    matching_rows = address_matches[address_matches['address_normalized'].isin(best_addresses)].copy()
                     
-                    # Get the indices of these matches in the original DataFrame
-                    best_addresses = [m[0] for m in best_matches]
-                    matching_rows = address_matches[address_matches['address_normalized'].isin(best_addresses)]
-                    
-                    # Sort by formation date (most recent first) and take the first one
-                    # The DataFrame is already sorted by formation_date_parsed descending
                     if not matching_rows.empty:
+                        # Calculate name similarity score for each match
+                        if business_name_clean:
+                            matching_rows['name_similarity'] = matching_rows['entityname_clean'].apply(
+                                lambda x: fuzz.token_sort_ratio(business_name_clean, x)
+                            )
+                        else:
+                            matching_rows['name_similarity'] = 0
+                        
+                        # Sort by: status_priority (asc), name_similarity (desc), formation_date (desc)
+                        matching_rows = matching_rows.sort_values(
+                            ['status_priority', 'name_similarity', 'formation_date_parsed'],
+                            ascending=[True, False, False]
+                        )
+                        
                         best_match_idx = matching_rows.index[0]
                         return colorado_df.loc[best_match_idx], best_score
-    
-    return None, 0
     
     return None, 0
 
@@ -487,9 +623,15 @@ def find_best_match(
         return match, score, 'name'
     
     # If name matching failed, try matching by address (70% threshold)
+    # Pass business_name so we can use name similarity as a tiebreaker
     street_address = extract_street_address(address)
     if street_address:
-        match, score = find_best_match_by_address(street_address, city, colorado_df)
+        match, score = find_best_match_by_address(
+            street_address, 
+            city, 
+            colorado_df,
+            business_name=business_name
+        )
         if match is not None:
             return match, score, 'address'
     
