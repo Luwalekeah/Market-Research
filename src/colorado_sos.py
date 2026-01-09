@@ -131,7 +131,8 @@ def load_colorado_data() -> Optional[pd.DataFrame]:
             'agentfirstname',
             'agentmiddlename',
             'agentlastname',
-            'agentorganizationname'
+            'agentorganizationname',
+            'entityformationdate'  # To prioritize most recent businesses
         ]
         
         df = pd.read_csv(
@@ -146,6 +147,14 @@ def load_colorado_data() -> Optional[pd.DataFrame]:
         
         # Filter to Colorado businesses only
         df = df[df['principalstate'].str.upper() == 'CO']
+        
+        # Parse formation date and sort by most recent first
+        # This ensures when we find multiple matches, we get the most recent one
+        df['formation_date_parsed'] = pd.to_datetime(
+            df['entityformationdate'], 
+            errors='coerce'
+        )
+        df = df.sort_values('formation_date_parsed', ascending=False, na_position='last')
         
         # Clean up business names for matching
         df['entityname_clean'] = df['entityname'].fillna('').str.upper().str.strip()
@@ -166,7 +175,7 @@ def extract_city_from_address(address: str) -> str:
     Extract city name from a full address string.
     
     Args:
-        address: Full address like "123 Main St, Aurora, CO 80010"
+        address: Full address like "123 Main St, Aurora, CO 80010, USA"
     
     Returns:
         City name in uppercase, or empty string
@@ -174,13 +183,22 @@ def extract_city_from_address(address: str) -> str:
     if not address or pd.isna(address):
         return ""
     
-    parts = address.split(',')
+    parts = [p.strip() for p in address.split(',')]
     
-    # Typically: street, city, state zip
-    if len(parts) >= 2:
-        # City is usually the second-to-last part before "state zip"
-        city_part = parts[-2].strip() if len(parts) >= 2 else ""
-        return city_part.upper()
+    # Handle different address formats:
+    # Format 1: "Street, City, State ZIP, Country" (4 parts)
+    # Format 2: "Street, City, State ZIP" (3 parts)
+    # Format 3: "Street, City, State" (3 parts)
+    
+    if len(parts) >= 4:
+        # "Street, City, State ZIP, Country" - city is second part
+        return parts[1].upper()
+    elif len(parts) == 3:
+        # "Street, City, State ZIP" - city is second part
+        return parts[1].upper()
+    elif len(parts) == 2:
+        # "Street, City" - city is second part
+        return parts[1].upper()
     
     return ""
 
@@ -378,6 +396,7 @@ def find_best_match_by_address(
     """
     Find the best matching Colorado business entity by street address.
     Uses normalized addresses to handle variations like "#10" vs "Unit 10".
+    When multiple businesses match the same address, returns the most recently formed one.
     
     Args:
         street_address: Street address to match (e.g., "123 Main St #10")
@@ -410,15 +429,35 @@ def find_best_match_by_address(
             address_matches = city_matches[city_matches['address_normalized'] != '']
             
             if not address_matches.empty:
-                result = process.extractOne(
+                # Get all matches above threshold, not just the best one
+                results = process.extract(
                     street_normalized,
                     address_matches['address_normalized'].tolist(),
-                    scorer=fuzz.token_sort_ratio
+                    scorer=fuzz.token_sort_ratio,
+                    limit=10  # Get top 10 matches
                 )
                 
-                if result and result[1] >= threshold:
-                    match_idx = address_matches[address_matches['address_normalized'] == result[0]].index[0]
-                    return colorado_df.loc[match_idx], result[1]
+                # Filter to matches above threshold
+                good_matches = [(addr, score, idx) for addr, score, idx in results if score >= threshold]
+                
+                if good_matches:
+                    # Get the best score
+                    best_score = good_matches[0][1]
+                    
+                    # Find all matches with the best score
+                    best_matches = [m for m in good_matches if m[1] == best_score]
+                    
+                    # Get the indices of these matches in the original DataFrame
+                    best_addresses = [m[0] for m in best_matches]
+                    matching_rows = address_matches[address_matches['address_normalized'].isin(best_addresses)]
+                    
+                    # Sort by formation date (most recent first) and take the first one
+                    # The DataFrame is already sorted by formation_date_parsed descending
+                    if not matching_rows.empty:
+                        best_match_idx = matching_rows.index[0]
+                        return colorado_df.loc[best_match_idx], best_score
+    
+    return None, 0
     
     return None, 0
 
