@@ -1,5 +1,5 @@
 """
-Find Nearby Places - Streamlit Web Application
+Market Research Lead Generator - Streamlit Web Application
 
 A market research tool for discovering nearby businesses and extracting
 their contact information including phone numbers, websites, and emails.
@@ -24,10 +24,14 @@ from src import (
     generate_single_maps_link,
 )
 
+# App configuration
+APP_NAME = "LeadFinder Pro"  # Change this to your preferred name
+APP_ICON = "🎯"  # Options: 📍 🎯 🔍 📊 💼
+
 # Page configuration
 st.set_page_config(
-    page_title="Find Nearby Places",
-    page_icon="📍",
+    page_title=APP_NAME,
+    page_icon=APP_ICON,
     layout="wide"
 )
 
@@ -60,6 +64,7 @@ def load_css():
         border-radius: 10px;
         text-align: center;
     }
+    
     </style>
     """
     st.markdown(css, unsafe_allow_html=True)
@@ -68,16 +73,72 @@ load_css()
 
 
 def show_welcome_message():
-    """Display welcome message for first-time users."""
+    """Display welcome message for first-time users with integrated X close button."""
     if 'welcomed' not in st.session_state:
-        st.info(
-            "👋 **Welcome!** Enter a location, set your search distance, "
-            "and specify the types of places you're looking for. "
-            "Default: Denver, gas stations within 10 miles."
-        )
-        if st.button("Got it!", key="welcome_dismiss"):
+        
+        # Check if dismiss button was clicked
+        if st.session_state.get('dismiss_clicked', False):
             st.session_state.welcomed = True
+            st.session_state.dismiss_clicked = False
             st.rerun()
+        
+        # Create the banner with integrated X button
+        banner_col, btn_col = st.columns([50, 1])
+        
+        with banner_col:
+            st.markdown("""
+                <div style="
+                    background: #1e3a5f;
+                    color: white;
+                    padding: 15px 20px;
+                    border-radius: 10px;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                ">
+                    <span>👋 <strong>Welcome!</strong> Enter a location, set your search distance, and specify the types of places you're looking for. Default: Denver, gas stations within 10 miles.</span>
+                </div>
+            """, unsafe_allow_html=True)
+        
+        # Hidden button - we'll style it to appear inside the banner
+        with btn_col:
+            st.markdown("<div style='margin-top: 5px;'></div>", unsafe_allow_html=True)
+            clicked = st.button("✕", key="welcome_dismiss")
+            if clicked:
+                st.session_state.welcomed = True
+                st.rerun()
+        
+        # CSS to move the button visually inside the banner
+        st.markdown("""
+            <style>
+            /* Target the specific column with the X button and overlay it on the banner */
+            [data-testid="stHorizontalBlock"]:has([data-testid="baseButton-secondary"]) {
+                position: relative;
+            }
+            [data-testid="stHorizontalBlock"]:has([data-testid="baseButton-secondary"]) > [data-testid="stColumn"]:last-child {
+                position: absolute;
+                right: 25px;
+                top: 50%;
+                transform: translateY(-50%);
+                width: auto !important;
+                flex: none !important;
+            }
+            [data-testid="stHorizontalBlock"]:has([data-testid="baseButton-secondary"]) > [data-testid="stColumn"]:last-child button {
+                background: rgba(0, 0, 0, 0.3) !important;
+                border: none !important;
+                color: #000 !important;
+                font-weight: bold !important;
+                border-radius: 4px !important;
+                padding: 2px 10px !important;
+                min-height: 0 !important;
+                height: 28px !important;
+                line-height: 1 !important;
+            }
+            [data-testid="stHorizontalBlock"]:has([data-testid="baseButton-secondary"]) > [data-testid="stColumn"]:last-child button:hover {
+                background: rgba(0, 0, 0, 0.5) !important;
+            }
+            </style>
+        """, unsafe_allow_html=True)
 
 
 def main():
@@ -85,7 +146,7 @@ def main():
     
     # Header
     st.markdown(
-        "<h1 style='text-align: center;'>📍 Find Nearby Places</h1>",
+        f"<h1 style='text-align: center;'>{APP_ICON} {APP_NAME}</h1>",
         unsafe_allow_html=True
     )
     
@@ -95,8 +156,8 @@ def main():
     with st.sidebar:
         st.header("About")
         st.markdown("""
-        This app helps you discover businesses near any location
-        and gather their contact information.
+        Discover businesses near any location and gather their 
+        contact information for lead generation.
         
         **Features:**
         - Search by location & radius
@@ -130,6 +191,11 @@ def main():
             help="Match businesses against Colorado Secretary of State database to find registered agent names."
         )
         
+        # Filter options (only show when SOS lookup is enabled)
+        filter_low_similarity = False
+        min_name_similarity = 50
+        filter_good_standing_only = False
+        
         if match_colorado_sos:
             # Show Colorado data status
             co_status = get_colorado_data_status()
@@ -140,6 +206,33 @@ def main():
                 )
             else:
                 st.caption("⚠️ Data will be downloaded on first use (~200MB)")
+            
+            # Filter options
+            st.divider()
+            
+            # Good Standing filter
+            filter_good_standing_only = st.checkbox(
+                "Only 'Good Standing' businesses",
+                value=True,
+                help="Only show businesses with 'Good Standing' status (excludes Delinquent)"
+            )
+            
+            # Filter option for mismatched names
+            filter_low_similarity = st.checkbox(
+                "Hide mismatched business names",
+                value=True,
+                help="Filter out results where the Google Places name doesn't match the Colorado registered name (e.g., different business at same address)"
+            )
+            
+            if filter_low_similarity:
+                min_name_similarity = st.slider(
+                    "Minimum name similarity %",
+                    min_value=0,
+                    max_value=100,
+                    value=40,
+                    step=5,
+                    help="Only show results where Google name is at least this similar to Colorado business name. 40% is recommended."
+                )
     
     # Check API key
     if not GOOGLE_MAPS_API_KEY:
@@ -340,6 +433,20 @@ def main():
                     filtered_df['Email'].notna() & (filtered_df['Email'] != '')
                 ]
             
+            # Apply Good Standing filter (from sidebar settings)
+            if filter_good_standing_only and 'EntityStatus' in filtered_df.columns:
+                # Keep rows where: no match (EntityStatus is empty) OR status is Good Standing
+                has_match = (filtered_df['EntityStatus'].notna() & (filtered_df['EntityStatus'] != ''))
+                is_good_standing = filtered_df['EntityStatus'].str.upper().str.contains('GOOD STANDING', na=False)
+                filtered_df = filtered_df[~has_match | is_good_standing]
+            
+            # Apply name similarity filter (from sidebar settings)
+            if filter_low_similarity and 'NameSimilarity' in filtered_df.columns:
+                # Keep rows where: no match (NameSimilarity=0 and BusinessName is empty) OR similarity >= threshold
+                has_match = (filtered_df['BusinessName'].notna() & (filtered_df['BusinessName'] != ''))
+                meets_threshold = (filtered_df['NameSimilarity'] >= min_name_similarity)
+                filtered_df = filtered_df[~has_match | meets_threshold]
+            
             # Display table
             st.dataframe(
                 filtered_df,
@@ -350,6 +457,14 @@ def main():
                     "Email": st.column_config.TextColumn("Email"),
                     "Distance": st.column_config.NumberColumn("Distance (mi)", format="%.2f"),
                     "Rating": st.column_config.NumberColumn("Rating", format="%.1f"),
+                    "MatchConfidence": st.column_config.NumberColumn("Match %", format="%.0f"),
+                    "NameSimilarity": st.column_config.ProgressColumn(
+                        "Name Match",
+                        format="%.0f%%",
+                        min_value=0,
+                        max_value=100,
+                        help="How similar the Google Places name is to the Colorado registered business name"
+                    ),
                 }
             )
             

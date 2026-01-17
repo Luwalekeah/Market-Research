@@ -35,6 +35,7 @@ def places_to_dataframe(places: list) -> pd.DataFrame:
         'phone': 'Phone',
         'website': 'Website',
         'email': 'Email',
+        'email_source': 'EmailSource',
         'opening_hours': 'Opening_Hours',
         'rating': 'Rating',
         'review_count': 'Review_Count'
